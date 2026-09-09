@@ -9,9 +9,14 @@
 > escrevendo — e na call você pega o que ele não sabe que precisa contar. Se não
 > rolar call, mande o texto.
 >
-> **Peça junto (vale mais que metade das respostas):** a planilha de controle
-> atual, 3 XMLs de CT-e recentes, 1 extrato do cartão de combustível e 1 acerto
-> de agregado já fechado.
+> **Peça junto (vale mais que metade das respostas):** extrato do cartão de
+> combustível dos **últimos 3 a 6 meses**, XMLs de CT-e, extrato da tag de
+> pedágio, 1 acerto de agregado já fechado e notas de manutenção arquivadas.
+>
+> ⚠️ **O cliente não tem planilha de controle** — está organizando a operação
+> agora. Não peça a planilha; peça os extratos. As fontes primárias existem
+> mesmo sem consolidação, e é com elas que reconstruímos o histórico
+> (`01-avaliacao-e-arquitetura.md` §9.3).
 
 ---
 
@@ -41,8 +46,10 @@ Se algum item não se aplica, é só dizer "não se aplica".
 9. Vocês conseguem acessar os **arquivos XML** dos CT-e emitidos? (é o que evita
    redigitar todo frete no sistema novo)
 10. Emitem MDF-e? Por onde?
-11. 🔴 Como é o controle **hoje**: planilha Excel, caderno, algum sistema? Pode
-    mandar uma cópia (mesmo bagunçada)?
+11. 🔴 Hoje, como vocês acompanham quanto cada caminhão gastou e faturou? Se
+    existir qualquer controle — planilha, caderno, anotação — pode mandar cópia.
+    Se não existir nenhum, sem problema: como você calcula hoje se um frete
+    valeu a pena?
 12. Quem faz o controle hoje, e quanto tempo por dia isso toma?
 13. O contador usa algum sistema que precise receber dados daqui?
 
@@ -120,8 +127,10 @@ Se algum item não se aplica, é só dizer "não se aplica".
 53. Você quer acessar do celular também, ou só relatório no computador?
 54. O contador precisa de acesso?
 55. Tem preferência de quando isso precisa estar rodando? Alguma data importante?
-56. Vocês querem começar **do zero** a partir de uma data, ou precisam trazer o
-    histórico das planilhas?
+56. Vocês têm uma data em mente pra virar a chave e registrar tudo no sistema?
+57. 🔴 Quem na empresa vai ter a responsabilidade de **fechar as viagens toda
+    semana**? Precisa ser uma pessoa específica.
+58. Os motoristas anotam a quilometragem do painel hoje, em algum momento?
 
 ## ✂️ ------- ATÉ AQUI -------
 
@@ -133,7 +142,8 @@ Se algum item não se aplica, é só dizer "não se aplica".
 |---|---|
 | **1** — carga fechada ou fracionada | Se for fechada, viagem = frete e o motor de rateio some. Se for fracionada, precisa de rateio configurável. Muda o modelo de dados inteiro. |
 | **8, 9** — CT-e e XML | Com XML, a receita entra sozinha. Sem, alguém digita todo frete à mão — e o projeto ganha uma tela de digitação e um risco de adoção. |
-| **11** — controle atual | A planilha dele **é** a especificação funcional. Mostra os campos que ele usa, os que ignora e o vocabulário da casa. |
+| **11** — controle atual | Não existe planilha, então a especificação vem da conta que ele já faz de cabeça. Saber como ele calcula hoje evita que o sistema contrarie a lógica dele sem explicar. |
+| **57** — responsável pelo fechamento | Sem controle formalizado hoje, o sistema **cria** a rotina em vez de apoiar uma existente. Sem alguém com nome nessa tarefa, o sistema fica vazio no segundo mês. |
 | **14** — precificação | Define se cabe tabela de preço e simulador de frete, e como validar o valor lançado. |
 | **20–23** — remuneração do agregado | O campo de maior risco de retrabalho do projeto. Errar aqui refaz o motor de acerto e todos os relatórios de agregado. |
 | **30** — remuneração do motorista | Mesma regra do acerto, e define se comissão é custo direto do frete ou custo fixo mensal. |

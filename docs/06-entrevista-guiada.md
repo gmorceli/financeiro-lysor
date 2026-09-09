@@ -19,7 +19,7 @@ envia.
 
 **O que esperar:**
 
-- São cerca de 40 perguntas, mas muitas serão puladas conforme suas respostas.
+- São cerca de 45 perguntas, mas muitas serão puladas conforme suas respostas.
 - Leva de **20 a 40 minutos**. Pode parar e voltar depois — é só reabrir a mesma
   conversa e dizer "vamos continuar".
 - **"Não sei" é uma resposta válida.** Não trave. Anotamos e resolvemos depois.
@@ -31,10 +31,17 @@ envia.
 (algo como `LEVANTAMENTO-SUAEMPRESA-2026-09-09.md`). É só clicar em baixar e nos
 enviar esse arquivo. Mande junto, se conseguir — vale mais que muitas respostas:
 
-- 📊 A planilha ou caderno de controle que você usa hoje
-- 📄 3 XMLs de CT-e recentes
-- ⛽ 1 extrato do cartão de combustível
+- ⛽ **Extrato do cartão de combustível dos últimos 3 a 6 meses**
+- 📄 XMLs de CT-e emitidos (quanto mais, melhor)
+- 🛣️ Extrato da tag de pedágio dos últimos meses
 - 🤝 1 acerto de agregado já fechado
+- 🔧 Notas fiscais de manutenção que estiverem arquivadas
+- 📊 Qualquer controle que exista — planilha, caderno, anotação no WhatsApp
+
+> Mesmo que vocês não tenham um controle organizado, **esses extratos já contam a
+> história da operação**. Com eles conseguimos montar o histórico de custo por
+> caminhão sem ninguém digitar nada — e o sistema já nasce com dado dentro em vez
+> de tela vazia.
 
 > **Privacidade:** não é preciso informar senhas, dados de cartão ou conta
 > bancária completa em nenhum momento. Se alguma pergunta parecer pedir isso,
@@ -154,7 +161,7 @@ dele fixa?
 *por que:* se as carretas circulam entre caminhões, os custos delas precisam ser
 controlados separadamente.
 
-### BLOCO B — Documentos e controle de hoje (6 perguntas)
+### BLOCO B — Documentos e controle de hoje (6–7 perguntas)
 
 **[B8]** Vocês emitem CT-e? Por qual sistema?
 *por que:* o CT-e já tem cliente, rota, peso e valor do frete. Se conseguirmos
@@ -170,10 +177,20 @@ com o PDF — quem faz a emissão normalmente sabe. Pode conferir depois."
 **[B10]** Emitem MDF-e também? Por onde?
 *por que:* mesma lógica do CT-e, para o manifesto da viagem.
 
-**[B11]** Como é o controle hoje — planilha, caderno, algum sistema, WhatsApp?
+**[B11]** Hoje, como vocês acompanham quanto cada caminhão gastou e faturou —
+tem alguma planilha, caderno, ou é mais no controle da cabeça mesmo?
 *por que:* é a base do que vamos construir. O que funciona hoje a gente mantém.
-→ Peça uma cópia, **mesmo que esteja bagunçada**. Insista uma vez com
-gentileza: é o item mais valioso da entrevista inteira.
+→ **Nunca demonstre surpresa ou julgamento se a resposta for "não temos nada".**
+É comum e não é problema — na verdade facilita, porque não há vício a corrigir.
+Diga isso a ele, em uma linha, e siga.
+→ Se existir qualquer controle, mesmo bagunçado, peça uma cópia.
+→ **Se não existir controle nenhum, faça a pergunta extra [B11b].**
+
+**[B11b]** *(só se não houver controle algum)* Quando você quer saber se um frete
+valeu a pena, como você faz essa conta hoje?
+*por que:* revela o raciocínio que ele já usa. O sistema precisa devolver a conta
+que ele faz de cabeça, só que certa e automática — se contrariar a lógica dele
+sem explicar, ele não confia no resultado.
 
 **[B12]** Quem faz esse controle e quanto tempo por dia isso toma?
 *por que:* mostra onde está o retrabalho e quem vai usar o sistema no dia a dia.
@@ -279,7 +296,10 @@ contas com os cupons depois?
 *por que:* o extrato do cartão traz litros, valor e quilometragem prontos. É a
 maior economia de digitação do sistema inteiro.
 → Se usa, faça **[F35]**: "dá pra baixar o extrato em Excel? Consegue nos mandar
-um de exemplo?"
+os **últimos 3 a 6 meses**?"
+   Explique o porquê, porque é contraintuitivo: "com esses extratos a gente
+   consegue montar o histórico de consumo e custo de cada caminhão sem vocês
+   digitarem nada — o sistema já começa com informação dentro."
 → Se não usa, pergunte como o abastecimento é pago e controlado hoje.
 
 **[F36]** Usam tag de pedágio — Sem Parar, ConectCar, Veloe? Conseguem o extrato?
@@ -343,7 +363,7 @@ Sabe qual compensa mais?
 Por rota? Por motorista?
 *por que:* define quais relatórios entram na primeira versão.
 
-### BLOCO H — Quem vai usar (5 perguntas)
+### BLOCO H — Quem vai usar e como começa (7 perguntas)
 
 **[H49]** Quem vai mexer no sistema no dia a dia, e quantas pessoas?
 *por que:* define quantos acessos e o nível de simplicidade das telas.
@@ -362,9 +382,23 @@ informação valiosa, não um problema.
 **[H52]** Você quer acessar do celular também, ou prefere relatório no computador?
 *por que:* define o que precisa funcionar bem em tela pequena.
 
-**[H53]** Vocês querem começar do zero a partir de uma data, ou precisam trazer
-o histórico das planilhas?
-*por que:* define o trabalho de arranque e a data de virada.
+**[H53]** Vocês têm uma data em mente pra virar a chave e começar a registrar
+tudo no sistema?
+*por que:* define a data de corte e o que precisa ser levantado até lá — odômetro
+de cada caminhão, parcelas de financiamento, o que está a receber e a pagar.
+
+**[H54]** Quem na empresa vai ter a responsabilidade de fechar as viagens toda
+semana — conferir abastecimento, despesa e acerto?
+*por que:* esta é a pergunta que decide se o sistema vai funcionar. Sem alguém
+com o nome nessa tarefa, o sistema fica vazio em dois meses. Precisa ser uma
+pessoa específica, não "o pessoal do escritório".
+→ Se ele não souber responder, registre exatamente assim e marque em **pontos de
+atenção**. Não sugira nome nem cargo.
+
+**[H55]** Os motoristas anotam a quilometragem do painel hoje, em algum momento?
+*por que:* a quilometragem é a base de todo cálculo de custo por km. Se ninguém
+anota hoje, precisamos criar essa rotina junto com o sistema — e é melhor saber
+disso antes.
 
 ### Encerramento
 
@@ -372,8 +406,12 @@ Pergunte: **"Tem alguma coisa importante da operação de vocês que eu não
 perguntei?"** Deixe ele falar sem interromper. Costuma sair aqui o detalhe mais
 importante da entrevista inteira.
 
-Depois agradeça, lembre dos arquivos (planilha atual, XMLs de CT-e, extrato de
-combustível, acerto de agregado) e gere o arquivo de respostas.
+Depois agradeça e **lembre dos arquivos**, com ênfase nos extratos: cartão de
+combustível dos últimos 3 a 6 meses, XMLs de CT-e, extrato de tag de pedágio,
+um acerto de agregado e notas de manutenção. Reforce em uma linha que esses
+arquivos permitem o sistema nascer com o histórico dentro, sem digitação.
+
+Depois gere o arquivo de respostas.
 
 ---
 
@@ -429,6 +467,7 @@ Status: [COMPLETO | PARCIAL — parou no bloco X]
 - B9 Acesso aos XMLs:
 - B10 MDF-e:
 - B11 Controle hoje:
+- B11b Como calcula se o frete valeu a pena (se não há controle):
 - B12 Quem faz / tempo gasto:
 - B13 Sistema do contador:
 
@@ -482,7 +521,9 @@ Status: [COMPLETO | PARCIAL — parou no bloco X]
 - H50 Familiaridade com computador:
 - H51 Motorista lança pelo celular:
 - H52 Acesso por celular:
-- H53 Histórico ou começar do zero:
+- H53 Data de virada pretendida:
+- H54 Responsável pelo fechamento semanal:
+- H55 Motoristas anotam quilometragem hoje:
 
 ## 🔍 ACHADOS FORA DO ROTEIRO
 [Coisas relevantes que surgiram e não estavam nas perguntas. Regras informais,
@@ -494,10 +535,12 @@ específico — esta seção costuma ser a mais útil de todas.]
 que precisa confirmar com outra pessoa.]
 
 ## 📎 ARQUIVOS QUE ELE VAI ENVIAR
-- [ ] Planilha / controle atual
+- [ ] Extrato do cartão de combustível (últimos 3–6 meses)
 - [ ] XMLs de CT-e
-- [ ] Extrato do cartão de combustível
+- [ ] Extrato da tag de pedágio
 - [ ] Exemplo de acerto de agregado
+- [ ] Notas fiscais de manutenção
+- [ ] Controle atual, se existir
 - [ ] Outros:
 ```
 

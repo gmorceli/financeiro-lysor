@@ -17,6 +17,11 @@ Decisões já fechadas: sistema **single-tenant** (sob medida para este cliente)
 MVP no escopo **Completo** — operação, custos, rateio, relatórios de resultado,
 contas a pagar/receber, fluxo de caixa e acerto de motorista/agregado.
 
+⚠️ **Contexto que muda o projeto:** o cliente **não tem controle formalizado
+hoje** — está estruturando a operação agora. Não há planilha a migrar, mas
+também não há rotina de coleta de dados. O maior risco deixou de ser técnico e
+passou a ser de adoção. Ver `docs/01-avaliacao-e-arquitetura.md` §9.
+
 | Documento | O que é |
 |---|---|
 | [`docs/01-avaliacao-e-arquitetura.md`](docs/01-avaliacao-e-arquitetura.md) | Avaliação de boas práticas, decisões de arquitetura e o modelo de custo em cascata |

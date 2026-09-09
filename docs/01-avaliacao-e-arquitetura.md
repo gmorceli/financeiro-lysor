@@ -223,5 +223,84 @@ mobile offline-first no MVP. Seis caminhões geram na casa de 300 lançamentos/m
 | Odômetro errado ou não anotado | Custo/km inviável | Validação de km crescente; ler odômetro do cartão de combustível quando disponível |
 | Cliente pedir emissão de CT-e no meio do projeto | Estoura prazo e orçamento | Fronteira escrita na proposta desde já (ver `02-escopo-mvp.md`) |
 | Regra de pagamento do agregado mais complexa que o previsto | Retrabalho no motor de acerto | Levantar **antes de codar** (questionário, bloco D) |
-| Migração das planilhas atuais | Atraso na virada | Definir corte: histórico entra como saldo, não como lançamento |
+| **Não existe rotina de coleta hoje** (cliente sem controle formalizado) | **Alto** — o sistema não substitui um processo, ele cria um. Sem hábito de anotar km e guardar cupom, o sistema fica vazio no mês 2 | Ver §9. Importação como fonte primária, rotina semanal de fechamento acordada na implantação, painel de viagens incompletas como cobrança visível |
+| Sem baseline para conferir o primeiro relatório | O dono vê o número e não sabe se está certo | Reconstruir linha de base retroativa a partir de extratos que já existem (§9) |
 | Dono querer conferir com o contador e não bater | Perda de confiança | Deixar explícito: gerencial ≠ fiscal, e mostrar o anexo de cada número |
+
+---
+
+## 9. Cliente sem controle formalizado — implicações
+
+O cliente **não tem planilha nem sistema hoje**; está estruturando a operação
+agora. Isso muda o projeto em quatro pontos.
+
+### 9.1 O que melhora
+
+- **Sem migração e sem legado.** Corte limpo por data. Nenhum saldo herdado de
+  planilha inconsistente, nenhuma gambiarra do controle antigo para acomodar.
+- **O sistema pode ditar o processo.** Não precisa espelhar um fluxo ruim que já
+  existe — desenha-se o fluxo certo e o sistema o impõe.
+- **Escopo menor.** Some a importação de histórico e some o piloto em paralelo.
+
+### 9.2 O que piora — e é o maior risco do projeto
+
+**Não existe rotina de coleta.** O motorista não tem hábito de anotar odômetro,
+ninguém guarda cupom de abastecimento, nenhuma nota de manutenção é arquivada
+com o veículo. O sistema não vai substituir um processo: **vai criar um.**
+
+Isso reclassifica o projeto. Não é entrega de software, é **implantação de
+gestão**. Se a rotina não for combinada e cobrada, o sistema fica vazio no
+segundo mês e a conclusão do cliente será "o sistema não funcionou".
+
+Consequências de projeto:
+
+1. **A importação deixa de ser conveniência e vira a fonte primária confiável.**
+   Dado que chega sozinho (extrato de cartão de combustível, extrato de tag,
+   XML de CT-e) é o único que não depende de hábito que ainda não existe.
+   → Se o cliente usar cartão de combustível (pergunta F34), **puxar a
+   importação do extrato para dentro do MVP**, não deixar na Fatia 2.
+2. **O painel de "viagens incompletas" vira feature de primeira ordem**, não
+   detalhe: é o instrumento de cobrança da rotina.
+3. **A implantação precisa de uma rotina semanal escrita e acordada** — quem
+   fecha viagem, quando, e o que acontece quando não fecha. Isso entra na
+   proposta como item de escopo, não como cortesia.
+
+### 9.3 Onde está o histórico que ele acha que não tem
+
+Ele não tem planilha, mas a operação roda há tempo — então as **fontes
+primárias existem**, só nunca foram consolidadas:
+
+| Fonte | O que dá | Cobertura típica |
+|---|---|---|
+| Extrato do cartão de combustível | Litros, valor, posto, data, às vezes odômetro | 6–12 meses |
+| XMLs de CT-e emitidos | Receita por frete, cliente, rota, peso | Desde o início da emissão |
+| Extrato da tag de pedágio | Pedágio por placa e data | 6–12 meses |
+| Extrato bancário | Pagamentos de manutenção, seguro, parcelas | 12 meses |
+| Notas fiscais de manutenção | Custo por veículo | O que estiver arquivado |
+
+**Recomendação: pedir 3 a 6 meses dessas fontes e reconstruir uma linha de base
+retroativa antes do go-live.** Retorno alto por três motivos:
+
+- Dá **custo/km e km/l reais** desde o dia 1, sem esperar três meses de operação.
+- Resolve o problema de confiança: o dono abre o sistema e já vê o passado dele
+  ali, em vez de uma tela vazia pedindo que ele digite.
+- Serve de **validação do motor de cálculo** — o papel que a planilha teria.
+
+Custo: um script de importação que já estava previsto na Fatia 2, adiantado.
+
+### 9.4 Onboarding de dia zero
+
+Sem planilha, o arranque exige uma sessão de cadastro assistido. O que precisa
+ser levantado na virada:
+
+- Odômetro atual de cada caminhão (foto do painel, com data)
+- Valor e data de aquisição de cada veículo (para depreciação)
+- Parcelas de financiamento em aberto: valor e quantidade restante
+- Contas a receber já emitidas e ainda não recebidas
+- Contas a pagar já assumidas e ainda não pagas
+- Saldo das contas bancárias na data de corte
+- Adiantamentos a motoristas e agregados em aberto
+
+**Recomendação: tratar isso como uma tela de "abertura" no sistema**, guiada,
+não como planilha de importação. É a primeira coisa que o cliente vai usar — e a
+primeira impressão dele sobre a facilidade do sistema.

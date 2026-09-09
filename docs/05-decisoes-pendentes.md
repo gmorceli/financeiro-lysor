@@ -23,8 +23,8 @@ pagar/receber + fluxo de caixa + acerto de motorista e agregado.**
 É a Fatia 1 inteira de `02-escopo-mvp.md`.
 
 Razão: o AP/AR sai quase de graça porque o modelo de lançamento único já foi
-desenhado para isso, e é ele que faz o financeiro **largar a planilha**. Sem
-isso o sistema vira relatório paralelo e morre no terceiro mês.
+desenhado para isso, e é ele que dá ao dinheiro **um lugar único**. Sem isso o
+sistema vira relatório paralelo e morre no terceiro mês.
 
 Importação de XML/cartão e PWA do motorista ficam na Fatia 2 — dependem de
 respostas do cliente (perguntas B9, F34, F35, H51) que ainda não temos.
@@ -45,10 +45,26 @@ inclui parcela do financiamento) e "Resultado econômico" (inclui depreciação,
 exclui a parte de principal da parcela). É um toggle no relatório, não dois
 sistemas — e evita a discussão contábil que trava a entrega.
 
-### D5. Piloto em paralelo
-**Recomendação: um mês rodando junto com a planilha atual.** Aumenta o prazo até
-o "aceite", mas é o que constrói confiança no número. Fechar isso na proposta
-para não virar reclamação de atraso.
+### D5. Como construir confiança no número (revisto)
+O cliente **não tem controle formalizado hoje**, então o piloto em paralelo que
+eu recomendava não existe — não há com o que comparar.
+
+**Recomendação: baseline retroativo.** Pedir 3 a 6 meses de extrato de cartão de
+combustível, XMLs de CT-e e extrato de tag, e reconstruir o passado dele antes do
+go-live. O sistema abre mostrando custo/km e km/l reais em vez de tela vazia.
+Detalhes em `01-avaliacao-e-arquitetura.md` §9.3 e §9.4.
+
+**Consequência de escopo a decidir:** se ele usar cartão de combustível (F34),
+a importação do extrato sai da Fatia 2 e entra no MVP — é a única fonte de dado
+confiável enquanto a rotina de coleta não existir. Custo estimado: poucos dias.
+**Recomendo aceitar esse custo.**
+
+### D6. A rotina de coleta entra no escopo?
+Sem hábito de anotar odômetro nem de guardar cupom, o sistema cria o processo em
+vez de apoiar um existente. **Recomendação: incluir na proposta, como item
+explícito, a definição e o acompanhamento da rotina semanal de fechamento nas
+primeiras 4 semanas.** É o que separa "sistema entregue" de "sistema em uso" — e
+se não for vendido como escopo, vira trabalho não pago e culpa do software.
 
 ---
 
@@ -64,7 +80,7 @@ para não virar reclamação de atraso.
 | C6 | Faturamento por CT-e ou agrupado | C16 | Define existência da entidade `fatura` |
 | C7 | PWA do motorista no MVP | H50, H51 | ±2 semanas de escopo |
 | C8 | Depreciação no lucro | F43 | Muda a definição de "lucro" no relatório principal |
-| C9 | Migração de histórico | H56 | Define esforço de importação inicial |
+| C9 | ~~Migração de histórico~~ — **resolvido**: não há planilha a migrar. Em aberto: quais extratos ele consegue fornecer para o baseline retroativo | B9, F35, F36 | Define se o sistema abre com dado ou vazio |
 | C10 | Carreta separada do cavalo | A7 | Adiciona entidade `implemento` e rateio de custo entre conjunto |
 
 ---
@@ -83,3 +99,5 @@ Trabalhando com estas premissas para não parar. Todas revisáveis:
 7. **Sem integração com rastreador** no MVP; odômetro entra manualmente.
 8. Sem emissão de boleto no MVP — cobrança segue pelo processo atual do cliente.
 9. **Single-tenant** — um cliente, uma instalação (decisão D1).
+10. **Sem controle formalizado hoje** (confirmado pelo cliente) — sem migração,
+    mas com risco alto de adoção e necessidade de baseline retroativo.
