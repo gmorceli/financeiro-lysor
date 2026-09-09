@@ -24,8 +24,15 @@ contas a pagar/receber, fluxo de caixa e acerto de motorista/agregado.
 | [`docs/03-modelo-de-dados.md`](docs/03-modelo-de-dados.md) | Entidades, relacionamentos e regras de rateio |
 | [`docs/04-questionario-cliente.md`](docs/04-questionario-cliente.md) | Questionário pronto para enviar ao cliente |
 | [`docs/05-decisoes-pendentes.md`](docs/05-decisoes-pendentes.md) | Decisões que dependem de resposta antes de codar |
+| [`docs/06-entrevista-guiada.md`](docs/06-entrevista-guiada.md) | **Enviar ao cliente.** Roteiro para o Claude dele conduzir a entrevista, uma pergunta por vez, e exportar as respostas em arquivo |
 
 ## Próximo passo
 
-Enviar o questionário (`docs/04-questionario-cliente.md`) ao cliente e fechar as
-decisões pendentes. Sem isso, o modelo de rateio não fecha.
+Enviar `docs/06-entrevista-guiada.md` ao cliente — ele anexa no Claude dele, é
+entrevistado uma pergunta por vez e devolve um `LEVANTAMENTO-<EMPRESA>-<data>.md`
+com as respostas estruturadas.
+
+(`docs/04-questionario-cliente.md` é a mesma coleta em formato de questionário
+escrito — alternativa para quando a entrevista guiada não for viável.)
+
+Sem essas respostas, o modelo de rateio não fecha.
