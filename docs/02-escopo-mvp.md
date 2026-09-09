@@ -21,7 +21,10 @@ depois — inclusive coisas que "seriam legais".
 - **Viagem**: veículo + motorista + período + origem/destino + km inicial/final +
   km carregado / km vazio
 - **Frete (CT-e / OS)**: vinculado à viagem — cliente, rota, produto, peso,
-  valor do frete, pedágio destacado, data de entrega
+  **cabeças** (carga viva), **valor do CT-e e valor real do frete**, pedágio
+  destacado, data de entrega
+- 🔄 **Frete de agregado**: modalidade própria, em que a receita é a comissão
+  (10%) + seguro (0,06% da carga), não o valor do CT-e
 - Uma viagem aceita N fretes (se o cliente rodar carga fracionada — a confirmar)
 - **Tela "Fechar viagem"**: o fluxo principal do sistema, faz tudo num lugar só
 
@@ -48,18 +51,41 @@ depois — inclusive coisas que "seriam legais".
 
 ### Relatórios — o entregável
 1. **Resultado por caminhão** (mês/período): receita, custo direto, custo do
-   veículo, margem, **R$/km**, **custo/km**, **km/l**, km rodado, km vazio
+   veículo, margem, **R$/km**, **custo/km**, **km/l**, km rodado, **% km vazio**
+   (a regra nesta operação, não a exceção)
 2. **Resultado por frete/viagem**: DRE em cascata do frete
-3. **Resultado por cliente** e **por rota**
-4. **Frota própria × agregados**: comparativo de margem
+3. **Resultado por cliente** e **por rota** — com **R$/km, R$/cabeça e R$/kg**,
+   que é a conta que a cliente já faz a lápis, e **km improdutivo por cliente**
+4. **Frota própria × agregado**: as duas linhas de negócio lado a lado —
+   estruturas de capital opostas, não comparáveis por margem % apenas
 5. **DRE gerencial** consolidado em cascata
 6. **Fluxo de caixa**: a receber e a pagar por vencimento
 7. Exportação XLSX e PDF em todos eles
 
-### Dashboard
-Seis números e nada mais: faturamento do mês · custo do mês · lucro operacional ·
-custo/km da frota · km/l médio · títulos vencendo em 7 dias.
-Mais um painel de alerta: **viagens com dados incompletos**.
+### Dashboard — ✏️ **revisto pelo levantamento**
+
+> **Correção:** a versão anterior propunha um dashboard de indicadores
+> gerenciais. Perguntada sobre a tela que abriria toda manhã, a cliente
+> respondeu **contas a pagar, contas a receber e saldo de caixa** — não pediu
+> lucro por caminhão. O dashboard é financeiro; o gerencial é relatório de
+> fechamento.
+
+**Dashboard (todo dia):** a receber · a pagar · saldo de caixa · vencimentos da
+semana · viagens em aberto · **viagens com dados incompletos**.
+
+**Relatórios (no fechamento):** lucro por caminhão, por frete, por cliente, por
+rota, por motorista, e frota própria × agregado. Ela pediu todos.
+
+### Meta de desempenho de uso 🔄
+
+O objetivo declarado da cliente não é decidir melhor — é **parar de perder o
+dia** (hoje: *"muitas horas"* diárias em folhas manuscritas, no fechamento
+*"perde muito tempo"*). Com 70 a 90 viagens/mês, ou 3 a 4 por dia útil:
+
+> **Fechar uma viagem completa em menos de 60 segundos.**
+
+É o critério que decide o desenho das telas. Um sistema com relatórios perfeitos
+e lançamento lento falha nesta cliente.
 
 ---
 

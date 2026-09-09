@@ -223,7 +223,9 @@ mobile offline-first no MVP. Seis caminhões geram na casa de 300 lançamentos/m
 | Odômetro errado ou não anotado | Custo/km inviável | Validação de km crescente; ler odômetro do cartão de combustível quando disponível |
 | Cliente pedir emissão de CT-e no meio do projeto | Estoura prazo e orçamento | Fronteira escrita na proposta desde já (ver `02-escopo-mvp.md`) |
 | Regra de pagamento do agregado mais complexa que o previsto | Retrabalho no motor de acerto | Levantar **antes de codar** (questionário, bloco D) |
-| **Não existe rotina de coleta hoje** (cliente sem controle formalizado) | **Alto** — o sistema não substitui um processo, ele cria um. Sem hábito de anotar km e guardar cupom, o sistema fica vazio no mês 2 | Ver §9. Importação como fonte primária, rotina semanal de fechamento acordada na implantação, painel de viagens incompletas como cobrança visível |
+| ~~Não existe rotina de coleta~~ → **rotina existe, mas em papel** | **Médio** (rebaixado pelo levantamento) — motoristas já anotam km e litros; o risco é a tela ser mais lenta que a folha | Meta de fechar viagem em <60s; lançamento pelo celular do motorista; painel de viagens incompletas |
+| **Sem fonte automática de combustível** | **Alto** — sem cartão e sem fatura detalhada, o maior custo variável é 100% digitado | Celular do motorista com foto do cupom; investigar relatório detalhado junto ao posto |
+| **Valor real do frete não fica registrado em lugar nenhum** | **Alto** — bloqueia lucro por frete e a comissão de 12% do motorista | Dois campos de valor no frete (fiscal e gerencial), ver `08-analise-do-levantamento.md` §2 |
 | Sem baseline para conferir o primeiro relatório | O dono vê o número e não sabe se está certo | Reconstruir linha de base retroativa a partir de extratos que já existem (§9) |
 | Dono querer conferir com o contador e não bater | Perda de confiança | Deixar explícito: gerencial ≠ fiscal, e mostrar o anexo de cada número |
 
@@ -242,11 +244,23 @@ agora. Isso muda o projeto em quatro pontos.
   existe — desenha-se o fluxo certo e o sistema o impõe.
 - **Escopo menor.** Some a importação de histórico e some o piloto em paralelo.
 
-### 9.2 O que piora — e é o maior risco do projeto
+### 9.2 O que piora — ✏️ **revisto pelo levantamento de 09/09/2026**
 
-**Não existe rotina de coleta.** O motorista não tem hábito de anotar odômetro,
-ninguém guarda cupom de abastecimento, nenhuma nota de manutenção é arquivada
-com o veículo. O sistema não vai substituir um processo: **vai criar um.**
+> **Correção:** este diagnóstico estava mais pessimista que a realidade. O
+> levantamento mostrou que a Lysor **tem rotina de coleta** — ela é só toda em
+> papel. Os motoristas já anotam km e litros a cada abastecimento; a Ana e o
+> Hygor já lançam despesa por veículo e viagem por viagem em folhas
+> manuscritas, gastando *"muitas horas"* por dia nisso.
+>
+> O problema não é criar hábito, é **redirecionar um hábito que já existe** do
+> papel para a tela. Risco rebaixado de **Alto** para **Médio**, e a solução
+> muda: menos evangelização, mais velocidade de lançamento. Detalhes em
+> `08-analise-do-levantamento.md` §3.
+
+O que continua valendo: **não há fonte automática de dado.** A Lysor não usa
+cartão de combustível e a fatura do posto não vem detalhada, então o
+abastecimento — maior custo variável — depende 100% de lançamento manual. Sem
+uma tela de lançamento muito rápida, a rotina volta pro papel.
 
 Isso reclassifica o projeto. Não é entrega de software, é **implantação de
 gestão**. Se a rotina não for combinada e cobrada, o sistema fica vazio no

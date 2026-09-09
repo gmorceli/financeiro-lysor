@@ -29,6 +29,31 @@ sistema vira relatório paralelo e morre no terceiro mês.
 Importação de XML/cartão e PWA do motorista ficam na Fatia 2 — dependem de
 respostas do cliente (perguntas B9, F34, F35, H51) que ainda não temos.
 
+### ✅ D4. Depreciação e financiamento — **fechada pelo levantamento**
+**Decidido pela cliente (F43): visão de caixa.** *"só o dinheiro que sai do
+caixa"* — sem depreciação no relatório de lucro. A parcela do financiamento
+entra integralmente como custo do veículo.
+
+Peso: 2 caminhões financiados, **R$ 42.000 por caminhão/mês, ~40 parcelas
+restantes** = R$ 84 mil/mês de desembolso fixo (valor a confirmar, follow-up 3
+do documento 08). É o maior custo fixo da empresa, e torna o resultado por
+caminhão o número mais importante do sistema: *esses dois pagam a própria
+parcela?*
+
+A visão econômica com depreciação fica como opção futura, fora do MVP.
+
+<details>
+<summary>Recomendação anterior, antes da resposta da cliente</summary>
+
+### D4. Depreciação e financiamento no cálculo de lucro
+Pergunta 43 do questionário, mas precisamos de posição técnica antes.
+**Recomendação: mostrar as duas visões** — "Resultado de caixa" (só desembolso,
+inclui parcela do financiamento) e "Resultado econômico" (inclui depreciação,
+exclui a parte de principal da parcela). É um toggle no relatório, não dois
+sistemas — e evita a discussão contábil que trava a entrega.
+
+</details>
+
 ---
 
 ## Decisões nossas — em aberto
@@ -37,13 +62,6 @@ respostas do cliente (perguntas B9, F34, F35, H51) que ainda não temos.
 Recomendação em `01-avaliacao-e-arquitetura.md` §7: Next.js + TypeScript +
 PostgreSQL + Prisma + shadcn/ui, deploy Vercel + Railway/Supabase.
 Confirmar antes de gerar o schema.
-
-### D4. Depreciação e financiamento no cálculo de lucro
-Pergunta 43 do questionário, mas precisamos de posição técnica antes.
-**Recomendação: mostrar as duas visões** — "Resultado de caixa" (só desembolso,
-inclui parcela do financiamento) e "Resultado econômico" (inclui depreciação,
-exclui a parte de principal da parcela). É um toggle no relatório, não dois
-sistemas — e evita a discussão contábil que trava a entrega.
 
 ### D5. Como construir confiança no número (revisto)
 O cliente **não tem controle formalizado hoje**, então o piloto em paralelo que
@@ -59,45 +77,63 @@ a importação do extrato sai da Fatia 2 e entra no MVP — é a única fonte de
 confiável enquanto a rotina de coleta não existir. Custo estimado: poucos dias.
 **Recomendo aceitar esse custo.**
 
-### D6. A rotina de coleta entra no escopo?
-Sem hábito de anotar odômetro nem de guardar cupom, o sistema cria o processo em
-vez de apoiar um existente. **Recomendação: incluir na proposta, como item
-explícito, a definição e o acompanhamento da rotina semanal de fechamento nas
-primeiras 4 semanas.** É o que separa "sistema entregue" de "sistema em uso" — e
-se não for vendido como escopo, vira trabalho não pago e culpa do software.
+### D6. A rotina de coleta entra no escopo? — ✏️ revista
+O levantamento mostrou que **a rotina existe** — motoristas anotam km e litros,
+a Ana e o Hygor lançam tudo em folhas. Ela é manual, não inexistente. Isso
+enfraquece o argumento de vender "implantação de rotina" como escopo separado.
+
+**Recomendação revista:** em vez de acompanhamento de rotina, incluir na proposta
+**uma semana de acompanhamento assistido no arranque** — as primeiras viagens
+fechadas junto com a Ana e o Hygor, para calibrar a velocidade de lançamento e
+conferir a conta na mão nas três primeiras (ver D5). Escopo menor, valor maior, e
+diretamente ligado ao objetivo declarado dela, que é ganhar tempo.
+
+O que continua valendo: se a tela for mais lenta que a folha de papel, eles
+voltam para a folha. A meta de **fechar viagem em menos de 60 segundos** é o
+requisito que substitui o discurso de rotina.
 
 ---
 
-## Decisões que dependem do cliente
+## Decisões que dependiam do cliente — **respondidas em 09/09/2026**
 
-| # | Decisão | Pergunta | Impacto se vier errado |
+Levantamento em `07-levantamento-lysor-2026-09-09.md`, análise em
+`08-analise-do-levantamento.md`.
+
+| # | Decisão | Resposta | Efeito |
 |---|---|---|---|
-| C1 | Viagem tem 1 ou N fretes | A1 | Refaz modelo de dados e motor de rateio |
-| C2 | Consumo de XML de CT-e | B8, B9 | Adiciona/remove tela de digitação de frete |
-| C3 | Regra de remuneração do agregado | D20–D23 | Refaz motor de acerto e relatórios de agregado |
-| C4 | Regra de remuneração do motorista | E30 | Muda classificação de custo direto × fixo |
-| C5 | Integração com cartão de combustível | F34, F35 | Define a fatia 2 e o maior ganho de usabilidade |
-| C6 | Faturamento por CT-e ou agrupado | C16 | Define existência da entidade `fatura` |
-| C7 | PWA do motorista no MVP | H50, H51 | ±2 semanas de escopo |
-| C8 | Depreciação no lucro | F43 | Muda a definição de "lucro" no relatório principal |
-| C9 | ~~Migração de histórico~~ — **resolvido**: não há planilha a migrar. Em aberto: quais extratos ele consegue fornecer para o baseline retroativo | B9, F35, F36 | Define se o sistema abre com dado ou vazio |
-| C10 | Carreta separada do cavalo | A7 | Adiciona entidade `implemento` e rateio de custo entre conjunto |
+| C1 | Viagem tem 1 ou N fretes | ✅ **Carga fechada** — 1 cliente por viagem | Rateio viagem→frete nasce pronto e desligado |
+| C2 | Consumo de XML de CT-e | ✅ Emite pelo Simples CT-e; XML disponível sob geração manual | Importação viável, mas **não resolve a receita gerencial** (ver C11) |
+| C3 | Regra do agregado | 🔄 **Invertida**: a Lysor **cobra** 10% do CT-e + 0,06% da NFe | Refez o modelo de receita. Maior mudança do projeto |
+| C4 | Regra do motorista | ✅ 12% de comissão sobre o **frete real**; 2 com salário fixo adicional | Comissão é custo direto; salário é custo fixo |
+| C5 | Cartão de combustível | ❌ **Não usa**, e a fatura do posto não é detalhada | Abastecimento 100% manual. Risco alto |
+| C6 | Faturamento por CT-e ou agrupado | ✅ CT-e a CT-e, *"às vezes passa 15 dias e juntamos"* | `fatura` continua existindo, uso eventual |
+| C7 | PWA do motorista no MVP | ✅ Ela quer *"tudo pelo celular"* (a precisar de confirmação) | Com C5 negativo, vira **essencial**, não opcional |
+| C8 | Depreciação no lucro | ✅ Só caixa (ver D4) | Fecha a definição de lucro |
+| C9 | Migração de histórico | ✅ Começar do zero em **01/09/2026** | Data de corte definida |
+| C10 | Carreta separada do cavalo | ✅ Fixa por cavalo, *"às vezes troca"* | Entidade `conjunto` com vigência |
 
----
+### Novas decisões abertas pelo levantamento
 
-## Premissas assumidas até a resposta chegar
+| # | Decisão | Situação |
+|---|---|---|
+| C11 | **Valor real do frete × valor do CT-e** | Resolvido no desenho (dois campos no frete). Falta confirmar com a cliente como ela quer a tela pedir a confirmação |
+| C12 | O dinheiro do frete do agregado passa pela conta da Lysor? | **Em aberto** — muda o contas a receber. Follow-up 2 |
+| C13 | Quantos veículos ao todo | **Em aberto** — briefing dizia 6 caminhões, folhas mostram 4 cavalos + 2 carretas. Follow-up 1 |
+| C14 | Morte/perda de animal em viagem | **Não perguntado.** Específico de carga viva. Follow-up 6 |
+| C15 | GTA registrada junto ao frete? | **Não perguntado.** Follow-up 7 |
+| C16 | `vCarga` do XML resolve o valor da NFe? | **A validar** no primeiro XML real. Elimina a digitação mais chata do acerto do agregado |
 
-Trabalhando com estas premissas para não parar. Todas revisáveis:
+## Premissas — situação após o levantamento
 
-1. Carga majoritariamente **fechada** (1 viagem ≈ 1 frete), mas o modelo já
-   suporta N fretes por viagem — o rateio nasce pronto e desligado.
-2. O cliente **emite CT-e** por algum emissor e consegue os XMLs.
-3. Agregado remunerado por **percentual do frete**, com combustível por conta dele.
-4. Operação em **território nacional**, sem transporte internacional.
-5. Sem carga perigosa ou refrigerada com exigência regulatória adicional.
-6. Volume na casa de **300–500 lançamentos/mês** — não exige otimização especial.
-7. **Sem integração com rastreador** no MVP; odômetro entra manualmente.
-8. Sem emissão de boleto no MVP — cobrança segue pelo processo atual do cliente.
-9. **Single-tenant** — um cliente, uma instalação (decisão D1).
-10. **Sem controle formalizado hoje** (confirmado pelo cliente) — sem migração,
-    mas com risco alto de adoção e necessidade de baseline retroativo.
+| # | Premissa original | Situação |
+|---|---|---|
+| 1 | Carga majoritariamente fechada | ✅ **Confirmada** |
+| 2 | Emite CT-e e consegue os XMLs | ✅ **Confirmada** (Simples CT-e) |
+| 3 | Agregado remunerado por % do frete, combustível por conta dele | 🔄 **Metade errada**: combustível é dele, mas a Lysor **cobra**, não paga |
+| 4 | Operação nacional, sem transporte internacional | ✅ Confirmada — regional em MT, até 400 km |
+| 5 | Sem carga perigosa ou refrigerada | 🔄 **É carga viva (gado)** — traz cabeças, GTA e risco de perda de animal |
+| 6 | 300–500 lançamentos/mês | 🔄 **600–900/mês** (70 a 90 viagens). Sem impacto técnico, mas exige UX rápida |
+| 7 | Sem integração com rastreador; odômetro manual | ✅ Confirmada — odômetro anotado à mão hoje |
+| 8 | Sem emissão de boleto no MVP | ✅ Mantida |
+| 9 | Single-tenant | ✅ Mantida (decisão D1) |
+| 10 | Sem controle formalizado, risco alto de adoção | 🔄 **Revista**: existe controle, todo manuscrito. Risco rebaixado para médio — ver `01` §9.2 |

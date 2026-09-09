@@ -17,10 +17,15 @@ Decisões já fechadas: sistema **single-tenant** (sob medida para este cliente)
 MVP no escopo **Completo** — operação, custos, rateio, relatórios de resultado,
 contas a pagar/receber, fluxo de caixa e acerto de motorista/agregado.
 
-⚠️ **Contexto que muda o projeto:** o cliente **não tem controle formalizado
-hoje** — está estruturando a operação agora. Não há planilha a migrar, mas
-também não há rotina de coleta de dados. O maior risco deixou de ser técnico e
-passou a ser de adoção. Ver `docs/01-avaliacao-e-arquitetura.md` §9.
+**Cliente:** Lysor Transportes LTDA — transporte de **gado vivo** em Mato
+Grosso, viagens regionais de até 400 km, 70 a 90 viagens/mês. Controle atual:
+folhas manuscritas. Data de corte: 01/09/2026.
+
+⚠️ **A descoberta que mudou o projeto:** na Lysor o agregado **paga** a
+transportadora (10% do CT-e + 0,06% de seguro sobre a carga), em vez de receber
+dela. Receita de margem quase pura, sem custo variável. Isso inverteu o modelo de
+receita e é a maior mudança do planejamento — ver
+[`docs/08-analise-do-levantamento.md`](docs/08-analise-do-levantamento.md).
 
 | Documento | O que é |
 |---|---|
@@ -29,15 +34,12 @@ passou a ser de adoção. Ver `docs/01-avaliacao-e-arquitetura.md` §9.
 | [`docs/03-modelo-de-dados.md`](docs/03-modelo-de-dados.md) | Entidades, relacionamentos e regras de rateio |
 | [`docs/04-questionario-cliente.md`](docs/04-questionario-cliente.md) | Questionário pronto para enviar ao cliente |
 | [`docs/05-decisoes-pendentes.md`](docs/05-decisoes-pendentes.md) | Decisões que dependem de resposta antes de codar |
-| [`docs/06-entrevista-guiada.md`](docs/06-entrevista-guiada.md) | **Enviar ao cliente.** Roteiro para o Claude dele conduzir a entrevista, uma pergunta por vez, e exportar as respostas em arquivo |
+| [`docs/06-entrevista-guiada.md`](docs/06-entrevista-guiada.md) | Roteiro de entrevista guiada (já aplicado) |
+| [`docs/07-levantamento-lysor-2026-09-09.md`](docs/07-levantamento-lysor-2026-09-09.md) | **Respostas do cliente.** Entrevista com Ana Veronica, 09/09/2026 |
+| [`docs/08-analise-do-levantamento.md`](docs/08-analise-do-levantamento.md) | **Leia este.** O que o levantamento derrubou, as mudanças no modelo e o follow-up |
 
 ## Próximo passo
 
-Enviar `docs/06-entrevista-guiada.md` ao cliente — ele anexa no Claude dele, é
-entrevistado uma pergunta por vez e devolve um `LEVANTAMENTO-<EMPRESA>-<data>.md`
-com as respostas estruturadas.
-
-(`docs/04-questionario-cliente.md` é a mesma coleta em formato de questionário
-escrito — alternativa para quando a entrevista guiada não for viável.)
-
-Sem essas respostas, o modelo de rateio não fecha.
+Levantamento feito. Restam **7 confirmações curtas** com a cliente
+(`docs/08-analise-do-levantamento.md` §7) — nenhuma delas bloqueia o início do
+trabalho. Falta fechar a stack (decisão D2) para gerar o schema.
