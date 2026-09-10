@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { freteAgregadoSchema, freteProprioSchema } from '@/lib/validacao'
 import { calcularCobrancaAgregado, type RegraCobrancaAgregado } from '@/lib/calculos'
+import { gerarTitulosDoFrete } from '@/lib/titulos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
 
@@ -28,17 +29,22 @@ export async function salvarFreteProprio(
   }
 
   try {
-    if (id) {
-      await prisma.frete.update({ where: { id }, data: payload })
-    } else {
-      await prisma.frete.create({ data: payload })
-    }
+    await prisma.$transaction(async (tx) => {
+      if (id) {
+        await tx.frete.update({ where: { id }, data: payload })
+      } else {
+        const frete = await tx.frete.create({ data: payload, select: { id: true } })
+        // O recebível do cliente nasce junto com o frete.
+        await gerarTitulosDoFrete(tx, frete.id)
+      }
+    })
   } catch (erro) {
     return traduzirErroPrisma(erro, ROTULOS)
   }
 
   revalidatePath(`/viagens/${viagemId}`)
   revalidatePath('/fretes')
+  revalidatePath('/financeiro')
   redirect(rota(`/viagens/${viagemId}`))
 }
 
@@ -90,16 +96,20 @@ export async function salvarFreteAgregado(
   }
 
   try {
-    if (id) {
-      await prisma.frete.update({ where: { id }, data: payload })
-    } else {
-      await prisma.frete.create({ data: payload })
-    }
+    await prisma.$transaction(async (tx) => {
+      if (id) {
+        await tx.frete.update({ where: { id }, data: payload })
+      } else {
+        const frete = await tx.frete.create({ data: payload, select: { id: true } })
+        await gerarTitulosDoFrete(tx, frete.id)
+      }
+    })
   } catch (erro) {
     return traduzirErroPrisma(erro, ROTULOS)
   }
 
   revalidatePath('/fretes')
+  revalidatePath('/financeiro')
   redirect(rota('/fretes'))
 }
 

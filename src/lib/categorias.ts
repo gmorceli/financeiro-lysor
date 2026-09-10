@@ -14,6 +14,7 @@ export const CATEGORIA = {
   COMISSAO_AGREGADO: 'Comissão de agregado',
   SEGURO_AGREGADO: 'Seguro cobrado de agregado',
   COMISSAO_MOTORISTA: 'Comissão de motorista',
+  REPASSE_AGREGADO: 'Repasse a agregado',
 } as const
 
 /**

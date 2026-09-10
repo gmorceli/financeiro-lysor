@@ -42,10 +42,11 @@ receita e é a maior mudança do planejamento — ver
 
 ## Estado do código
 
-**Cadastros, operação e custos funcionando.** Schema com 21 tabelas, migration
-aplicada, as cinco telas de cadastro, o fluxo operacional (abrir viagem, lançar
-frete, fechar viagem) e o lançamento de custos com geração automática dos
-títulos financeiros.
+**Cadastros, operação, custos e financeiro funcionando.** Schema com 21 tabelas,
+migration aplicada, as cinco telas de cadastro, o fluxo operacional (abrir
+viagem, lançar frete, fechar viagem), o lançamento de custos e o financeiro
+completo — contas a pagar e a receber, baixa de títulos, fluxo de caixa e a tela
+da manhã.
 
 ```bash
 npm install
@@ -62,6 +63,7 @@ npm run typecheck         # tipos
 npm run verificar         # regras de validação dos cadastros
 npm run verificar:fluxo   # fluxo operacional contra o banco
 npm run verificar:custos  # custos, títulos e margem contra o banco
+npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
 npm run build             # build de produção
 ```
 
@@ -95,6 +97,29 @@ A tela de abastecimento mostra o preço do litro e o consumo desde o último
 tanque cheio enquanto o operador digita, o que dá chance de perceber o erro de
 digitação na hora: 1,8 km/l salta aos olhos de quem conhece a frota.
 
+### Financeiro
+
+Nada é digitado duas vezes: **os títulos nascem sozinhos**. Cada frete lançado
+gera o recebível; cada custo gera o pagável. A tela financeira é de conferência
+e baixa, não de digitação.
+
+O frete de agregado gera títulos diferentes conforme o fluxo do dinheiro:
+
+| Fluxo | Títulos gerados |
+|---|---|
+| Frota própria | recebível do cliente, pelo valor real do frete |
+| Agregado intermediado | recebível do cliente (valor cheio) mais repasse ao agregado com gatilho AO_RECEBER |
+| Agregado direto | recebível do agregado, só comissão e seguro |
+
+O **gatilho AO_RECEBER** é a tradução do "acerta quando o cliente paga": o
+repasse ao agregado nasce sem vencimento e só ganha data quando o recebível do
+cliente é quitado. No fluxo de caixa ele fica numa faixa própria — projetá-lo
+numa data inventada daria uma falsa sensação de compromisso marcado.
+
+A tela da manhã é o que a cliente pediu: a receber, a pagar, saldo projetado,
+o que vence em sete dias e as viagens em aberto — com aviso quando há título
+vencido ou viagem fechada sem frete lançado.
+
 ### Decisões de interface que vieram do levantamento
 
 - **Veículo é identificado pelo apelido**, não pela placa — nas folhas da
@@ -115,9 +140,9 @@ Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supab
 
 ## Próximo passo
 
-Financeiro — contas a pagar e a receber, baixa de títulos, fluxo de caixa e o
-dashboard que a cliente pediu (a receber, a pagar, saldo). Depois o acerto de
-motorista e agregado, e o relatório de resultado por caminhão e por frete.
+Acerto de motorista e agregado, e o relatório de resultado por caminhão e por
+frete — a pergunta que originou o projeto. O DRE em cascata já tem todas as
+peças no banco: falta a tela que as apresenta.
 
 Faltando: **autenticação** (antes de qualquer deploy) e os **XMLs de CT-e** da
 cliente, para validar se `infCarga/vCarga` traz o valor da nota — o que
