@@ -42,11 +42,10 @@ receita e é a maior mudança do planejamento — ver
 
 ## Estado do código
 
-**Cadastros, operação, custos e financeiro funcionando.** Schema com 21 tabelas,
-migration aplicada, as cinco telas de cadastro, o fluxo operacional (abrir
-viagem, lançar frete, fechar viagem), o lançamento de custos e o financeiro
-completo — contas a pagar e a receber, baixa de títulos, fluxo de caixa e a tela
-da manhã.
+**MVP completo.** Schema com 21 tabelas, migration aplicada, e as cinco fatias
+da aplicação: cadastros, operação (viagem e frete), custos, financeiro (contas
+a pagar e receber, baixa, fluxo de caixa, tela da manhã) e o relatório de
+resultado por caminhão e por frete.
 
 ```bash
 npm install
@@ -64,6 +63,7 @@ npm run verificar         # regras de validação dos cadastros
 npm run verificar:fluxo   # fluxo operacional contra o banco
 npm run verificar:custos  # custos, títulos e margem contra o banco
 npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
+npm run verificar:resultado   # cascata do DRE e rateio por frete
 npm run build             # build de produção
 ```
 
@@ -120,6 +120,36 @@ A tela da manhã é o que a cliente pediu: a receber, a pagar, saldo projetado,
 o que vence em sete dias e as viagens em aberto — com aviso quando há título
 vencido ou viagem fechada sem frete lançado.
 
+### Resultado
+
+A pergunta que originou o projeto, respondida em cascata:
+
+```
+Receita de frete
+− custos diretos (diesel, pedágio, comissão)
+= MARGEM DE CONTRIBUIÇÃO ....... decide preço e aceitar ou recusar carga
+− custos dos caminhões (manutenção, seguro, parcela)
+= RESULTADO DA FROTA ........... decide manter, trocar ou vender caminhão
++ resultado dos agregados
+− custos fixos da empresa
+= LUCRO OPERACIONAL ............ o resultado de verdade
+```
+
+As duas primeiras camadas são fato: cada lançamento sabe a que viagem e a que
+veículo pertence. **Só a última usa rateio**, e por isso fica isolada no fim —
+se o critério mudar, as camadas de cima não se mexem.
+
+Frota própria e agregados aparecem **em blocos separados**, nunca somados numa
+margem média. O agregado não tem diesel, manutenção nem parcela: comparar os
+dois percentuais lado a lado leva a conclusão errada, porque são negócios com
+estruturas de capital opostas.
+
+No resultado **por frete**, diesel e pedágio são rateados na proporção da
+receita — o frete que responde por dois terços da viagem carrega dois terços do
+custo dela. A verificação garante que a soma dos rateios reconstrói o custo
+original e que a soma dos resultados por frete reconstrói o resultado da frota:
+o rateio não perde nem inventa dinheiro.
+
 ### Decisões de interface que vieram do levantamento
 
 - **Veículo é identificado pelo apelido**, não pela placa — nas folhas da
@@ -140,9 +170,12 @@ Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supab
 
 ## Próximo passo
 
-Acerto de motorista e agregado, e o relatório de resultado por caminhão e por
-frete — a pergunta que originou o projeto. O DRE em cascata já tem todas as
-peças no banco: falta a tela que as apresenta.
+**Autenticação**, antes de qualquer deploy — combinado para depois dos
+primeiros testes da cliente.
+
+Depois: acerto de motorista e agregado (que transforma a comissão calculada em
+título a pagar), exportação para Excel dos relatórios, e a importação de XML de
+CT-e e do extrato de pedágio, que corta boa parte da digitação.
 
 Faltando: **autenticação** (antes de qualquer deploy) e os **XMLs de CT-e** da
 cliente, para validar se `infCarga/vCarga` traz o valor da nota — o que

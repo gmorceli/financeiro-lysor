@@ -1,0 +1,250 @@
+/**
+ * Verifica o motor de resultado com um cenário construído para ter resposta
+ * conhecida de antemão.
+ *
+ * Um caminhão, um mês, dois fretes na mesma viagem — um valendo o dobro do
+ * outro, para o rateio proporcional ter o que provar. Mais um frete de
+ * agregado, que não pode carregar custo de frota nenhum.
+ */
+import { PrismaClient, Prisma } from '@prisma/client'
+import { calcularResultado, calcularResultadoPorFrete, limitesDoMes } from '../src/lib/resultado'
+import { arredondar } from '../src/lib/calculos'
+
+const prisma = new PrismaClient()
+let falhas = 0
+function checar(nome: string, ok: boolean, detalhe = '') {
+  console.log(`${ok ? '  ok  ' : ' FALHA'} ${nome}${detalhe ? ` — ${detalhe}` : ''}`)
+  if (!ok) falhas++
+}
+
+const MARCA = 'teste-resultado'
+// Um mês isolado, sem os dados dos outros roteiros de verificação.
+const ANO = 2025
+const MES = 3
+
+async function main() {
+  const { inicio, fim } = limitesDoMes(ANO, MES)
+
+  // Limpeza do que roteiros anteriores possam ter deixado neste mês.
+  await prisma.baixa.deleteMany({ where: { lancamento: { dataCompetencia: { gte: inicio, lte: fim } } } })
+  await prisma.lancamento.deleteMany({ where: { dataCompetencia: { gte: inicio, lte: fim } } })
+  await prisma.abastecimento.deleteMany({ where: { data: { gte: inicio, lte: fim } } })
+  await prisma.frete.deleteMany({ where: { dataEmissao: { gte: inicio, lte: fim } } })
+  await prisma.viagem.deleteMany({ where: { dataSaida: { gte: inicio, lte: fim } } })
+
+  const cliente = await prisma.cliente.findFirstOrThrow()
+  const agregado = await prisma.proprietario.findFirstOrThrow()
+  const veiculo = await prisma.veiculo.findFirstOrThrow({ where: { tipo: 'CAVALO' } })
+  const motorista = await prisma.motorista.findFirstOrThrow({
+    where: { percentualComissao: { gt: 0 } },
+  })
+  const cat = async (nome: string) =>
+    (await prisma.categoria.findUniqueOrThrow({ where: { nome } })).id
+
+  // --- Cenário --------------------------------------------------------------
+  // Viagem de 1.000 km (600 carregado, 400 vazio) com dois fretes:
+  // R$ 10.000 e R$ 5.000. Custos diretos: R$ 3.000 de diesel + R$ 300 de
+  // pedágio. Comissão de 12% sobre R$ 15.000 = R$ 1.800.
+  // Custo do veículo no mês: R$ 5.000 de manutenção.
+  // Overhead do mês: R$ 2.000.
+  const viagem = await prisma.viagem.create({
+    data: {
+      veiculoId: veiculo.id,
+      motoristaId: motorista.id,
+      dataSaida: new Date(Date.UTC(ANO, MES - 1, 10)),
+      dataChegada: new Date(Date.UTC(ANO, MES - 1, 12)),
+      kmInicial: 100000,
+      kmFinal: 101000,
+      kmCarregado: 600,
+      kmVazio: 400,
+      origem: 'A',
+      destino: 'B',
+      status: 'AGUARDANDO_ACERTO',
+      observacoes: MARCA,
+    },
+  })
+
+  for (const [numero, valor] of [['1001', 10000], ['1002', 5000]] as const) {
+    await prisma.frete.create({
+      data: {
+        viagemId: viagem.id,
+        clienteId: cliente.id,
+        modalidade: 'FROTA_PROPRIA',
+        numeroCte: numero,
+        origem: 'A',
+        destino: 'B',
+        valorCte: valor,
+        valorFreteReal: valor,
+        dataEmissao: new Date(Date.UTC(ANO, MES - 1, 10)),
+        observacoes: MARCA,
+      },
+    })
+  }
+
+  const diretos = [
+    { nome: 'Combustível', valor: 3000 },
+    { nome: 'Pedágio', valor: 300 },
+  ]
+  for (const d of diretos) {
+    await prisma.lancamento.create({
+      data: {
+        tipo: 'DESPESA',
+        categoriaId: await cat(d.nome),
+        descricao: `${d.nome} ${MARCA}`,
+        valor: new Prisma.Decimal(d.valor),
+        dataCompetencia: new Date(Date.UTC(ANO, MES - 1, 10)),
+        dataVencimento: new Date(Date.UTC(ANO, MES - 1, 20)),
+        viagemId: viagem.id,
+        veiculoId: veiculo.id,
+      },
+    })
+  }
+  await prisma.lancamento.create({
+    data: {
+      tipo: 'DESPESA',
+      categoriaId: await cat('Manutenção'),
+      descricao: `Manutenção ${MARCA}`,
+      valor: new Prisma.Decimal(5000),
+      dataCompetencia: new Date(Date.UTC(ANO, MES - 1, 15)),
+      dataVencimento: new Date(Date.UTC(ANO, MES - 1, 25)),
+      veiculoId: veiculo.id,
+    },
+  })
+  await prisma.lancamento.create({
+    data: {
+      tipo: 'DESPESA',
+      categoriaId: await cat('Contador'),
+      descricao: `Contador ${MARCA}`,
+      valor: new Prisma.Decimal(2000),
+      dataCompetencia: new Date(Date.UTC(ANO, MES - 1, 5)),
+      dataVencimento: new Date(Date.UTC(ANO, MES - 1, 10)),
+    },
+  })
+  await prisma.abastecimento.create({
+    data: {
+      veiculoId: veiculo.id,
+      viagemId: viagem.id,
+      data: new Date(Date.UTC(ANO, MES - 1, 10)),
+      litros: new Prisma.Decimal(400),
+      valorLitro: new Prisma.Decimal(7.5),
+      valorTotal: new Prisma.Decimal(3000),
+      odometro: 100500,
+      tanqueCheio: true,
+    },
+  })
+  await prisma.frete.create({
+    data: {
+      clienteId: cliente.id,
+      proprietarioId: agregado.id,
+      modalidade: 'AGREGADO',
+      fluxoFinanceiro: 'INTERMEDIADO',
+      origem: 'C',
+      destino: 'D',
+      valorCte: 8000,
+      valorFreteReal: 8000,
+      valorCargaNfe: 400000,
+      valorComissaoAgregado: 800,
+      valorSeguroAgregado: 240,
+      dataEmissao: new Date(Date.UTC(ANO, MES - 1, 18)),
+      observacoes: MARCA,
+    },
+  })
+
+  // --- Conferência do resultado do mês -------------------------------------
+  const r = await calcularResultado(inicio, fim)
+
+  checar('receita da frota própria', r.propria.receita === 15000, `R$ ${r.propria.receita}`)
+  checar(
+    'custo direto = diesel + pedágio + comissão de 12%',
+    r.propria.custoDireto === 5100,
+    `R$ ${r.propria.custoDireto} (3.000 + 300 + 1.800)`,
+  )
+  checar(
+    'margem de contribuição',
+    r.propria.margemContribuicao === 9900,
+    `R$ ${r.propria.margemContribuicao}`,
+  )
+  checar('custo do caminhão', r.propria.custoVeiculo === 5000, `R$ ${r.propria.custoVeiculo}`)
+  checar('resultado da frota', r.propria.resultado === 4900, `R$ ${r.propria.resultado}`)
+  checar(
+    'manutenção NÃO entrou no custo direto',
+    r.propria.custoDireto === 5100 && r.propria.custoVeiculo === 5000,
+  )
+  checar(
+    'receita de agregado é comissão + seguro',
+    r.agregado.receita === 1040,
+    `R$ ${r.agregado.receita} (o CT-e é 8.000)`,
+  )
+  checar('overhead do mês', r.overhead === 2000, `R$ ${r.overhead}`)
+  checar(
+    'lucro operacional = frota + agregado − overhead',
+    r.lucroOperacional === 3940,
+    `R$ ${r.lucroOperacional} (4.900 + 1.040 − 2.000)`,
+  )
+
+  checar('km rodado', r.propria.kmRodado === 1000)
+  checar('km vazio e percentual', r.propria.kmVazio === 400 && r.propria.percentualVazio === 40)
+  checar('consumo do mês', r.propria.consumo === 2.5, `${r.propria.consumo} km/l`)
+
+  const linhaVeiculo = r.porVeiculo[0]
+  checar(
+    'resultado por caminhão bate com o consolidado',
+    linhaVeiculo?.resultado === 4900 && linhaVeiculo.receita === 15000,
+  )
+  checar(
+    'R$/km e custo/km por caminhão',
+    linhaVeiculo?.receitaPorKm === 15 && linhaVeiculo.custoPorKm === 10.1,
+    `R$ ${linhaVeiculo?.receitaPorKm}/km de receita, R$ ${linhaVeiculo?.custoPorKm}/km de custo`,
+  )
+
+  // --- Conferência do rateio por frete -------------------------------------
+  const porFrete = await calcularResultadoPorFrete(inicio, fim)
+  const f1 = porFrete.find((f) => f.numeroCte === '1001')!
+  const f2 = porFrete.find((f) => f.numeroCte === '1002')!
+  const fAgregado = porFrete.find((f) => f.veiculo === null)!
+
+  checar('três fretes no período', porFrete.length === 3)
+  checar(
+    'rateio do custo direto é proporcional à receita (2/3 e 1/3)',
+    f1.custoDiretoRateado === 3400 && f2.custoDiretoRateado === 1700,
+    `R$ ${f1.custoDiretoRateado} e R$ ${f2.custoDiretoRateado} de R$ 5.100`,
+  )
+  checar(
+    'rateio do custo do caminhão segue a mesma proporção',
+    f1.custoVeiculoRateado === 3333.33 && f2.custoVeiculoRateado === 1666.67,
+    `R$ ${f1.custoVeiculoRateado} e R$ ${f2.custoVeiculoRateado} de R$ 5.000`,
+  )
+  checar(
+    'a soma dos rateios reconstrói o custo original',
+    arredondar(f1.custoDiretoRateado + f2.custoDiretoRateado) === 5100 &&
+      arredondar(f1.custoVeiculoRateado + f2.custoVeiculoRateado) === 5000,
+  )
+  checar(
+    'resultado do frete maior',
+    f1.resultado === arredondar(10000 - 3400 - 3333.33),
+    `R$ ${f1.resultado}`,
+  )
+  checar(
+    'frete de agregado não carrega custo de frota',
+    fAgregado.custoDiretoRateado === 0 && fAgregado.custoVeiculoRateado === 0,
+  )
+  checar(
+    'e sua receita é só a comissão e o seguro',
+    fAgregado.receita === 1040 && fAgregado.resultado === 1040,
+  )
+  checar(
+    'soma dos resultados por frete reconstrói o resultado da frota',
+    arredondar(f1.resultado + f2.resultado) === r.propria.resultado,
+    `R$ ${arredondar(f1.resultado + f2.resultado)} = R$ ${r.propria.resultado}`,
+  )
+
+  console.log(falhas === 0 ? '\nResultado verificado.' : `\n${falhas} falha(s).`)
+  await prisma.$disconnect()
+  process.exit(falhas === 0 ? 0 : 1)
+}
+
+main().catch(async (e) => {
+  console.error(e)
+  await prisma.$disconnect()
+  process.exit(1)
+})

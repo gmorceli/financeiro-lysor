@@ -18,7 +18,8 @@
     "verificar": "tsx scripts/verificar-regras.ts",
     "verificar:fluxo": "tsx scripts/verificar-fluxo.ts",
     "verificar:custos": "tsx scripts/verificar-custos.ts",
-    "verificar:financeiro": "tsx scripts/verificar-financeiro.ts"
+    "verificar:financeiro": "tsx scripts/verificar-financeiro.ts",
+    "verificar:resultado": "tsx scripts/verificar-resultado.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

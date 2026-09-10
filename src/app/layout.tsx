@@ -13,6 +13,7 @@ const NAVEGACAO = [
   { href: '/fretes', rotulo: 'Fretes' },
   { href: '/custos', rotulo: 'Custos' },
   { href: '/financeiro', rotulo: 'Financeiro' },
+  { href: '/relatorios', rotulo: 'Resultado' },
   { href: '/cadastros/veiculos', rotulo: 'Veículos' },
   { href: '/cadastros/motoristas', rotulo: 'Motoristas' },
   { href: '/cadastros/clientes', rotulo: 'Clientes' },
