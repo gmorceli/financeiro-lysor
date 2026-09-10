@@ -42,17 +42,38 @@ receita e é a maior mudança do planejamento — ver
 
 ## Estado do código
 
-Descoberta encerrada. **Schema de dados implementado** em
-[`prisma/schema.prisma`](prisma/schema.prisma) — 21 tabelas, validado, com DDL
-gerando limpo, mais o seed das categorias de transporte e dos cadastros já
-conhecidos.
+**Cadastros funcionando.** Schema com 21 tabelas, migration aplicada e as cinco
+telas de cadastro — veículos, motoristas, clientes, agregados e fornecedores —
+com listagem, criação e edição.
 
 ```bash
 npm install
 cp .env.example .env      # preencher DATABASE_URL
 npm run db:migrate        # cria as tabelas
 npm run db:seed           # categorias + frota + motoristas
+npm run dev               # http://localhost:3000
 ```
+
+Verificações:
+
+```bash
+npm run typecheck    # tipos
+npm run verificar    # regras de negócio dos cadastros
+npm run build        # build de produção
+```
+
+### Decisões de interface que vieram do levantamento
+
+- **Veículo é identificado pelo apelido**, não pela placa — nas folhas da
+  cliente não aparece uma única placa. A placa fica no cadastro, para o CT-e.
+- **`<select>` nativo** em vez de combobox com portal: metade da operação
+  acontece no celular, e o nativo é melhor lá.
+- **Cada campo com regra tem uma linha explicando o porquê** — o operador não
+  deve precisar adivinhar o que preencher.
+- **O formulário do agregado mostra a conta pronta** com um exemplo, para
+  conferir o percentual e o seguro na hora de cadastrar.
+- **Nada é apagado**: veículo sai de operação mudando de status, porque carrega
+  histórico de viagem e de custo.
 
 ## Stack
 
@@ -61,6 +82,9 @@ Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supab
 
 ## Próximo passo
 
-Telas de cadastro (veículos, motoristas, clientes, agregados), depois viagem e
-frete. Pendente da cliente: os XMLs de CT-e, para validar se `infCarga/vCarga`
-traz o valor da nota — o que eliminaria a digitação manual no acerto do agregado.
+Viagem e frete — a tela do dia a dia, com a meta de fechar uma viagem em menos
+de 60 segundos. Depois custos e o relatório de resultado.
+
+Faltando: **autenticação** (antes de qualquer deploy) e os **XMLs de CT-e** da
+cliente, para validar se `infCarga/vCarga` traz o valor da nota — o que
+eliminaria a digitação manual no acerto do agregado.

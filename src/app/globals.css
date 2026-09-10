@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-fundo: #f7f7f5;
+  --color-superficie: #ffffff;
+  --color-borda: #e4e4e0;
+  --color-texto: #1c1c1a;
+  --color-texto-suave: #6b6b66;
+  --color-primaria: #1f6f4a;
+  --color-primaria-clara: #e8f2ec;
+  --color-alerta: #b45309;
+  --color-erro: #b91c1c;
+}
+
+html,
+body {
+  background: var(--color-fundo);
+  color: var(--color-texto);
+}
+
+/* Alvos de toque confortáveis: a operação usa celular no pátio e na estrada. */
+@media (pointer: coarse) {
+  button,
+  a[role='button'],
+  input,
+  select {
+    min-height: 44px;
+  }
+}
