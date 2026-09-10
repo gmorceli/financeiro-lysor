@@ -275,3 +275,90 @@ export type ViagemInput = z.infer<typeof viagemSchema>
 export type FecharViagemInput = z.infer<typeof fecharViagemSchema>
 export type FreteProprioInput = z.infer<typeof freteProprioSchema>
 export type FreteAgregadoInput = z.infer<typeof freteAgregadoSchema>
+
+// ---------------------------------------------------------------------------
+// Custos
+// ---------------------------------------------------------------------------
+
+/**
+ * Abastecimento. Litros e odômetro são obrigatórios: sem os dois não existe
+ * km/l, e km/l é o indicador que sustenta o custo por quilômetro.
+ */
+export const abastecimentoSchema = z
+  .object({
+    veiculoId: z.string().trim().min(1, 'Escolha o caminhão'),
+    viagemId: textoOpcional,
+    motoristaId: textoOpcional,
+    fornecedorId: textoOpcional,
+    data: dataObrigatoria,
+    litros: numeroObrigatorio('os litros').refine((v) => v > 0, 'Precisa ser maior que zero'),
+    valorTotal: numeroObrigatorio('o valor pago').refine((v) => v > 0, 'Precisa ser maior que zero'),
+    odometro: numeroObrigatorio('a quilometragem do painel').refine(
+      (v) => v >= 0,
+      'Não pode ser negativa',
+    ),
+    tanqueCheio: booleanoFormulario,
+    formaPagamento: z.enum([
+      'DINHEIRO',
+      'PIX',
+      'CHEQUE',
+      'BOLETO',
+      'CARTAO',
+      'TRANSFERENCIA',
+    ]),
+    dataVencimento: dataOpcional,
+    observacoes: textoOpcional,
+  })
+  .transform((v) => ({ ...v, valorLitro: v.valorTotal / v.litros }))
+
+export const manutencaoSchema = z.object({
+  veiculoId: z.string().trim().min(1, 'Escolha o veículo'),
+  fornecedorId: textoOpcional,
+  data: dataObrigatoria,
+  odometro: numeroOpcional,
+  tipo: z.enum(['PREVENTIVA', 'CORRETIVA', 'PNEU', 'REVISAO']),
+  descricao: z.string().trim().min(3, 'Diga o que foi feito'),
+  valorPecas: decimalOpcional,
+  valorServico: decimalOpcional,
+  formaPagamento: z.enum([
+    'DINHEIRO',
+    'PIX',
+    'CHEQUE',
+    'BOLETO',
+    'CARTAO',
+    'TRANSFERENCIA',
+  ]),
+  dataVencimento: dataOpcional,
+  parcelas: numeroOpcional,
+})
+  .refine((v) => (v.valorPecas ?? 0) + (v.valorServico ?? 0) > 0, {
+    message: 'Informe o valor das peças ou da mão de obra',
+    path: ['valorServico'],
+  })
+  .refine((v) => (v.parcelas ?? 1) >= 1 && (v.parcelas ?? 1) <= 60, {
+    message: 'Entre 1 e 60 parcelas',
+    path: ['parcelas'],
+  })
+
+/** Despesa avulsa de viagem: pedágio, chapa, alimentação, lavagem. */
+export const despesaViagemSchema = z.object({
+  viagemId: z.string().trim().min(1, 'Despesa precisa estar em uma viagem'),
+  categoriaId: z.string().trim().min(1, 'Escolha o tipo de despesa'),
+  fornecedorId: textoOpcional,
+  data: dataObrigatoria,
+  descricao: z.string().trim().min(2, 'Diga do que se trata'),
+  valor: numeroObrigatorio('o valor').refine((v) => v > 0, 'Precisa ser maior que zero'),
+  formaPagamento: z.enum([
+    'DINHEIRO',
+    'PIX',
+    'CHEQUE',
+    'BOLETO',
+    'CARTAO',
+    'TRANSFERENCIA',
+  ]),
+  dataVencimento: dataOpcional,
+})
+
+export type AbastecimentoInput = z.infer<typeof abastecimentoSchema>
+export type ManutencaoInput = z.infer<typeof manutencaoSchema>
+export type DespesaViagemInput = z.infer<typeof despesaViagemSchema>

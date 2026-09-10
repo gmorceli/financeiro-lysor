@@ -42,9 +42,10 @@ receita e é a maior mudança do planejamento — ver
 
 ## Estado do código
 
-**Cadastros e operação funcionando.** Schema com 21 tabelas, migration aplicada,
-as cinco telas de cadastro (veículos, motoristas, clientes, agregados e
-fornecedores) e o fluxo operacional: abrir viagem, lançar frete, fechar viagem.
+**Cadastros, operação e custos funcionando.** Schema com 21 tabelas, migration
+aplicada, as cinco telas de cadastro, o fluxo operacional (abrir viagem, lançar
+frete, fechar viagem) e o lançamento de custos com geração automática dos
+títulos financeiros.
 
 ```bash
 npm install
@@ -57,10 +58,11 @@ npm run dev               # http://localhost:3000
 Verificações:
 
 ```bash
-npm run typecheck        # tipos
-npm run verificar        # regras de validação dos cadastros
-npm run verificar:fluxo  # fluxo operacional contra o banco
-npm run build            # build de produção
+npm run typecheck         # tipos
+npm run verificar         # regras de validação dos cadastros
+npm run verificar:fluxo   # fluxo operacional contra o banco
+npm run verificar:custos  # custos, títulos e margem contra o banco
+npm run build             # build de produção
 ```
 
 ### O fluxo de operação
@@ -77,6 +79,21 @@ npm run build            # build de produção
 Frete de agregado não passa por viagem: o caminhão é dele. A tela calcula a
 comissão e o seguro conforme os valores são digitados, mas quem grava é o
 servidor a partir da regra cadastrada — a tela é conferência, não entrada.
+
+### Custos
+
+Abastecimento e despesa de viagem são lançados **de dentro da viagem**, para o
+custo nascer apropriado ao frete certo. Manutenção tem tela própria: é custo do
+veículo, não da viagem.
+
+**Todo custo lançado vira um título financeiro na mesma transação.** Não existe
+"registrar a despesa" e depois "lançar a conta a pagar" — é um registro só, com
+competência, vencimento e pagamento separados. É o que impede o relatório
+gerencial e o financeiro de divergirem.
+
+A tela de abastecimento mostra o preço do litro e o consumo desde o último
+tanque cheio enquanto o operador digita, o que dá chance de perceber o erro de
+digitação na hora: 1,8 km/l salta aos olhos de quem conhece a frota.
 
 ### Decisões de interface que vieram do levantamento
 
@@ -98,8 +115,9 @@ Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supab
 
 ## Próximo passo
 
-Custos — abastecimento (com lançamento pelo celular do motorista), manutenção e
-despesas de viagem. Depois os títulos financeiros e o relatório de resultado.
+Financeiro — contas a pagar e a receber, baixa de títulos, fluxo de caixa e o
+dashboard que a cliente pediu (a receber, a pagar, saldo). Depois o acerto de
+motorista e agregado, e o relatório de resultado por caminhão e por frete.
 
 Faltando: **autenticação** (antes de qualquer deploy) e os **XMLs de CT-e** da
 cliente, para validar se `infCarga/vCarga` traz o valor da nota — o que

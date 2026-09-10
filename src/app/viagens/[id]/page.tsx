@@ -50,6 +50,12 @@ export default async function DetalheViagem({
         include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
         orderBy: { dataEmissao: 'asc' },
       },
+      lancamentos: {
+        where: { tipo: 'DESPESA' },
+        include: { categoria: { select: { nome: true } } },
+        orderBy: { dataCompetencia: 'asc' },
+      },
+      abastecimentos: { select: { litros: true } },
     },
   })
 
@@ -70,6 +76,15 @@ export default async function DetalheViagem({
   )
   const kmRodado = viagem.kmFinal != null ? viagem.kmFinal - viagem.kmInicial : null
   const aberta = viagem.status === 'EM_ANDAMENTO' || viagem.status === 'PLANEJADA'
+
+  // Custos diretos: o que foi apropriado a esta viagem. A comissão do motorista
+  // ainda não é um título — ela nasce no acerto — mas já entra na conta para o
+  // operador não ver uma margem inflada.
+  const custosLancados = viagem.lancamentos.reduce((soma, l) => soma + Number(l.valor), 0)
+  const custoDireto = custosLancados + comissao
+  const margem = receita - custoDireto
+  const litros = viagem.abastecimentos.reduce((soma, a) => soma + Number(a.litros), 0)
+  const consumoViagem = kmRodado && litros > 0 ? kmRodado / litros : null
 
   return (
     <>
@@ -198,6 +213,97 @@ export default async function DetalheViagem({
           </div>
         )}
       </Card>
+
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-borda px-4 py-3">
+          <h2 className="text-sm font-semibold text-texto">Custos desta viagem</h2>
+          {aberta && (
+            <div className="flex flex-wrap gap-2">
+              <Link href={rota(`/viagens/${viagem.id}/abastecimentos/novo`)}>
+                <Button variante="secundario">Abastecimento</Button>
+              </Link>
+              <Link href={rota(`/viagens/${viagem.id}/despesas/novo`)}>
+                <Button variante="secundario">Despesa</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {viagem.lancamentos.length === 0 ? (
+          <EstadoVazio
+            titulo="Nenhum custo lançado"
+            descricao="Diesel, pedágio e despesa de estrada entram aqui e viram conta a pagar automaticamente."
+            acao={
+              aberta ? (
+                <Link href={rota(`/viagens/${viagem.id}/abastecimentos/novo`)}>
+                  <Button>Lançar abastecimento</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <Tabela>
+            <thead>
+              <tr>
+                <Th>Data</Th>
+                <Th>Tipo</Th>
+                <Th>Descrição</Th>
+                <Th className="text-right">Valor</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {viagem.lancamentos.map((lancamento) => (
+                <tr key={lancamento.id} className="hover:bg-fundo">
+                  <Td className="tabular-nums text-texto-suave">
+                    {formatarData(lancamento.dataCompetencia)}
+                  </Td>
+                  <Td className="text-texto-suave">{lancamento.categoria.nome}</Td>
+                  <Td className="text-texto">{lancamento.descricao}</Td>
+                  <Td className="text-right tabular-nums font-medium text-texto">
+                    {formatarMoeda(lancamento.valor)}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabela>
+        )}
+      </Card>
+
+      {viagem.fretes.length > 0 && (
+        <Card className="mb-4 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-texto">Resultado da viagem</h2>
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-texto-suave">Receita</dt>
+              <dd className="tabular-nums text-texto">{formatarMoeda(receita)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-texto-suave">Custos lançados</dt>
+              <dd className="tabular-nums text-texto">− {formatarMoeda(custosLancados)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-texto-suave">Comissão do motorista</dt>
+              <dd className="tabular-nums text-texto">− {formatarMoeda(comissao)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-borda pt-1.5 font-medium">
+              <dt className="text-texto">Margem de contribuição</dt>
+              <dd
+                className={
+                  margem >= 0 ? 'tabular-nums text-primaria' : 'tabular-nums text-erro'
+                }
+              >
+                {formatarMoeda(margem)}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-texto-suave">
+            Ainda sem o custo do caminhão (manutenção, seguro, parcela) nem o custo fixo da
+            empresa — esses entram no relatório de resultado do mês.
+            {kmRodado ? ` Custo de ${formatarMoeda(custoDireto / kmRodado)} por km rodado.` : ''}
+            {consumoViagem ? ` Consumo de ${consumoViagem.toFixed(2).replace('.', ',')} km/l.` : ''}
+          </p>
+        </Card>
+      )}
 
       {aberta ? (
         <Card className="p-4">
