@@ -116,16 +116,29 @@ Levantamento em `07-levantamento-lysor-2026-09-09.md`, análise em
 | C9 | Migração de histórico | ✅ Começar do zero em **01/09/2026** | Data de corte definida |
 | C10 | Carreta separada do cavalo | ✅ Fixa por cavalo, *"às vezes troca"* | Entidade `conjunto` com vigência |
 
-### Novas decisões abertas pelo levantamento
+### Decisões abertas pelo levantamento — **todas respondidas em 10/09/2026**
 
-| # | Decisão | Situação |
-|---|---|---|
-| C11 | **Valor real do frete × valor do CT-e** | Resolvido no desenho (dois campos no frete). Falta confirmar com a cliente como ela quer a tela pedir a confirmação |
-| C12 | O dinheiro do frete do agregado passa pela conta da Lysor? | **Em aberto** — muda o contas a receber. Follow-up 2 |
-| C13 | Quantos veículos ao todo | **Em aberto** — briefing dizia 6 caminhões, folhas mostram 4 cavalos + 2 carretas. Follow-up 1 |
-| C14 | Morte/perda de animal em viagem | **Não perguntado.** Específico de carga viva. Follow-up 6 |
-| C15 | GTA registrada junto ao frete? | **Não perguntado.** Follow-up 7 |
-| C16 | `vCarga` do XML resolve o valor da NFe? | **A validar** no primeiro XML real. Elimina a digitação mais chata do acerto do agregado |
+| # | Decisão | Resposta | Efeito |
+|---|---|---|---|
+| C11 | Valor real × valor do CT-e | ✅ Quer registrar os dois; fluxo de confirmação por um clique aprovado | Dois campos no `frete`, implementados |
+| C12 | O dinheiro do agregado passa pela Lysor? | 🔄 **Os dois casos acontecem** | Novo enum `FluxoFinanceiroAgregado` (`INTERMEDIADO` \| `DIRETO`) |
+| C13 | Quantos veículos ao todo | ✅ **8**: 4 cavalos, 2 trucks, 2 carretas | `TipoVeiculo` ganha `TRUCK`; seed com os 8 |
+| C14 | Morte/perda de animal | ✅ Muito raro, acerto direto com o cliente, sem regra fixa | **Não modelar.** Vira observação na viagem |
+| C15 | GTA junto ao frete | ✅ Não precisa guardar a GTA; **a nota fiscal sim** | `numero_nfe` + anexo no frete |
+| C16 | `vCarga` do XML | ⏳ A validar quando os XMLs chegarem | Campo `valor_carga_nfe` já existe |
+| — | IPVA e licenciamento | ✅ Só 2 cavalos e 1 carreta pagam; resto isento | `isento_ipva`, `isento_licenciamento` |
+| — | Parcela do financiamento | ✅ R$ 42.000/mês **por cavalo**, 2 contratos, sem carreta, ~40 parcelas | R$ 84 mil/mês de custo fixo confirmado |
+| — | Preço por cabeça e por kg | ❌ **Descartado** pela cliente | Métricas removidas dos relatórios |
+| — | Relatório detalhado do posto | ❌ Prefere manter a anotação do motorista | PWA do motorista vira **essencial** |
+| — | "Tudo pelo celular" | ✅ As duas coisas: motorista lança pelo celular, escritório também acessa | Relatórios seguem no computador |
+
+### ✅ D7. PWA do motorista entra no MVP
+Consequência direta de C5 (sem cartão) + a escolha da cliente de não pedir
+relatório ao posto: **o lançamento pelo celular do motorista é a única fonte do
+maior custo variável da operação.** Sai da Fatia 2 e entra na Fatia 1.
+
+Sem ele, o custo por km não existe — e sem custo por km, o relatório que a
+cliente pediu não existe.
 
 ## Premissas — situação após o levantamento
 
@@ -135,9 +148,10 @@ Levantamento em `07-levantamento-lysor-2026-09-09.md`, análise em
 | 2 | Emite CT-e e consegue os XMLs | ✅ **Confirmada** (Simples CT-e) |
 | 3 | Agregado remunerado por % do frete, combustível por conta dele | 🔄 **Metade errada**: combustível é dele, mas a Lysor **cobra**, não paga |
 | 4 | Operação nacional, sem transporte internacional | ✅ Confirmada — regional em MT, até 400 km |
-| 5 | Sem carga perigosa ou refrigerada | 🔄 **É carga viva (gado)** — traz cabeças, GTA e risco de perda de animal |
+| 5 | Sem carga perigosa ou refrigerada | 🔄 **É carga viva (gado)**. GTA não precisa ser guardada; perda de animal é rara e sem regra fixa — não modelada |
 | 6 | 300–500 lançamentos/mês | 🔄 **600–900/mês** (70 a 90 viagens). Sem impacto técnico, mas exige UX rápida |
 | 7 | Sem integração com rastreador; odômetro manual | ✅ Confirmada — odômetro anotado à mão hoje |
 | 8 | Sem emissão de boleto no MVP | ✅ Mantida |
 | 9 | Single-tenant | ✅ Mantida (decisão D1) |
 | 10 | Sem controle formalizado, risco alto de adoção | 🔄 **Revista**: existe controle, todo manuscrito. Risco rebaixado para médio — ver `01` §9.2 |
+| 11 | Frota de 6 caminhões | 🔄 **8 veículos**: 4 cavalos, 2 trucks, 2 carretas |

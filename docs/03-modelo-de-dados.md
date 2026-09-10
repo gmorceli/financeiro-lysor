@@ -1,11 +1,13 @@
 # 03 — Modelo de dados proposto
 
-Modelo conceitual, **revisado após o levantamento da Lysor de 09/09/2026**
-(`08-analise-do-levantamento.md`). As mudanças estruturais em relação à versão
-anterior estão marcadas com 🔄.
+Modelo conceitual, revisado pelo levantamento de 09/09 e pelas confirmações da
+cliente de 10/09 (`10-respostas-confirmacoes-2026-09-10.md`). As mudanças
+estruturais em relação à primeira versão estão marcadas com 🔄.
 
-Nomes finais e tipos exatos saem na migration, depois das confirmações da
-seção 7 do documento 08.
+> ✅ **Este documento já está implementado.** O schema executável está em
+> [`prisma/schema.prisma`](../prisma/schema.prisma) — 21 tabelas, validado e
+> com DDL gerando limpo. Este arquivo continua sendo a explicação do porquê;
+> o schema é a verdade.
 
 ---
 
@@ -74,8 +76,14 @@ cascata de custo)
 > placa. Tela que mostra placa é tela que a cliente não reconhece. A placa fica
 > no cadastro, para o CT-e e a documentação.
 >
-> 🔄 Cavalo e carreta são **veículos separados**, cada um com seus custos
+> 🔄 Cavalo, truck e carreta são **veículos separados**, cada um com seus custos
 > (inclusive ANTT por carreta). Odômetro só se aplica a `CAVALO`/`TRUCK`.
+>
+> ✅ **Frota confirmada: 8 veículos** — 4 cavalos, 2 trucks, 1 carreta de 2
+> eixos e 1 carreta de 2 andares. Os "6 caminhões" do briefing inicial eram
+> 4 cavalos + 2 trucks; as folhas manuscritas não mostravam os trucks.
+> `isento_ipva` e `isento_licenciamento` existem porque só 2 cavalos e 1
+> carreta pagam — o resto é isento.
 
 ### `conjunto` 🔄 (cavalo + carreta com vigência)
 `id`, `cavalo_id`, `carreta_id`, `inicio`, `fim?`
@@ -112,6 +120,7 @@ cascata de custo)
 ### `frete` — **unidade de receita** (1 CT-e ou 1 OS) 🔄
 `id`, `viagem_id?`, `cliente_id`,
 **`modalidade`** (`FROTA_PROPRIA` | `AGREGADO`), `proprietario_id?`,
+**`fluxo_financeiro`** (`INTERMEDIADO` | `DIRETO`, só para agregado),
 `numero_cte?`, `chave_cte?` (44 dígitos, único), `serie?`,
 `origem`, `destino`, `produto`, `peso_kg?`, **`cabecas?`**, `volume?`,
 **`valor_cte`**, **`valor_frete_real`**, **`valor_carga_nfe?`**,
@@ -138,8 +147,20 @@ cascata de custo)
 > é digitado à mão porque o relatório do emissor não traz — mas o XML do CT-e
 > carrega em `infCarga/vCarga`. **Validar no primeiro XML real.**
 >
-> 🔄 **`cabecas`** — carga viva. A precificação informal da Lysor é por cabeça e
-> por kg, convivendo com a tabela por km. O relatório precisa dos três.
+> 🔄 **`fluxo_financeiro`** — a cliente confirmou que **os dois casos
+> acontecem**, e o sistema precisa dos dois:
+>
+> | fluxo | caminho do dinheiro | títulos gerados |
+> |---|---|---|
+> | `INTERMEDIADO` (maioria) | cliente paga a Lysor, que repassa ao agregado já descontando | receber do cliente (valor cheio) + pagar ao agregado (líquido) |
+> | `DIRETO` | agregado recebe do cliente e repassa só a comissão | receber do agregado (comissão + seguro) |
+>
+> A **receita da Lysor é a mesma nos dois** — comissão + seguro. Só o caminho
+> muda. É isso que mantém o relatório de resultado consistente.
+>
+> 🔄 **`cabecas`** e `peso_kg` continuam sendo registrados (vêm do CT-e), mas a
+> cliente **descartou** o controle de preço por cabeça e por kg. Sem métricas
+> de R$/cabeça e R$/kg nos relatórios.
 >
 > 🔄 **`cte_complemento_de_id`** liga um CT-e de complemento ao original, e
 > permite o sistema apontar quando um complemento deixou de ser emitido.
@@ -271,7 +292,7 @@ salário de R$ 2.805,50 **mais** os 12%.
 | View | Conteúdo |
 |---|---|
 | `vw_resultado_veiculo_mes` | receita, custo direto, custo do veículo, margem, km, custo/km, R$/km, km/l, **% km vazio** |
-| `vw_resultado_frete` | DRE em cascata por CT-e, com custo rateado da viagem, **R$/km · R$/cabeça · R$/kg** |
+| `vw_resultado_frete` | DRE em cascata por CT-e, com custo rateado da viagem e **R$/km** |
 | `vw_resultado_viagem` | consolidado da viagem antes do rateio |
 | `vw_resultado_cliente` | margem por embarcador, **+ km improdutivo do período** |
 | `vw_resultado_rota` | 🔄 margem por par origem→destino — alimenta a tabela de preço |

@@ -31,6 +31,10 @@ depois — inclusive coisas que "seriam legais".
 ### Custos
 - **Abastecimento**: data, posto, litros, valor, odômetro, tanque cheio (S/N)
   → calcula **km/l** automaticamente entre abastecimentos de tanque cheio
+- 🔄 **Lançamento do abastecimento pelo celular do motorista, com foto do
+  cupom** — entra no MVP. A cliente escolheu manter a anotação do motorista em
+  vez de pedir relatório detalhado ao posto, e sem cartão de combustível esta é
+  a **única** fonte do maior custo variável da operação.
 - **Pedágio**, despesas de estrada, diária/pernoite
 - **Manutenção**: preventiva / corretiva / pneu — com km, fornecedor, anexo da NF
 - **Custos fixos do veículo**: seguro, IPVA, licenciamento, rastreador,
@@ -54,8 +58,7 @@ depois — inclusive coisas que "seriam legais".
    veículo, margem, **R$/km**, **custo/km**, **km/l**, km rodado, **% km vazio**
    (a regra nesta operação, não a exceção)
 2. **Resultado por frete/viagem**: DRE em cascata do frete
-3. **Resultado por cliente** e **por rota** — com **R$/km, R$/cabeça e R$/kg**,
-   que é a conta que a cliente já faz a lápis, e **km improdutivo por cliente**
+3. **Resultado por cliente** e **por rota**, com R$/km e **km improdutivo por cliente**
 4. **Frota própria × agregado**: as duas linhas de negócio lado a lado —
    estruturas de capital opostas, não comparáveis por margem % apenas
 5. **DRE gerencial** consolidado em cascata
@@ -96,7 +99,8 @@ Alta prioridade porque é o que garante que o sistema sobreviva ao terceiro mês
 - Importação de **XML de CT-e** (pasta, upload em lote ou leitura de e-mail)
 - Importação do **extrato do cartão de combustível** (CSV/API)
 - Importação do **extrato da tag de pedágio**, casando por placa e data
-- **PWA do motorista**: abastecimento, despesa e fim de viagem — com foto
+- ~~PWA do motorista~~ → **promovido para o MVP** (ver Fatia 1). Fica aqui só a
+  evolução: modo offline e sincronização em área sem sinal
 - Faturamento agrupado: várias CT-e numa fatura só, com boleto/prazo do cliente
 
 ---

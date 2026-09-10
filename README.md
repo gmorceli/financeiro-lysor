@@ -37,12 +37,30 @@ receita e é a maior mudança do planejamento — ver
 | [`docs/06-entrevista-guiada.md`](docs/06-entrevista-guiada.md) | Roteiro de entrevista guiada (já aplicado) |
 | [`docs/07-levantamento-lysor-2026-09-09.md`](docs/07-levantamento-lysor-2026-09-09.md) | **Respostas do cliente.** Entrevista com Ana Veronica, 09/09/2026 |
 | [`docs/08-analise-do-levantamento.md`](docs/08-analise-do-levantamento.md) | **Leia este.** O que o levantamento derrubou, as mudanças no modelo e o follow-up |
-| [`docs/09-confirmacoes-ana.md`](docs/09-confirmacoes-ana.md) | **Enviar à cliente.** Validação do que entendemos + 10 perguntas curtas + arquivos pendentes |
+| [`docs/09-confirmacoes-ana.md`](docs/09-confirmacoes-ana.md) | Confirmações enviadas à cliente |
+| [`docs/10-respostas-confirmacoes-2026-09-10.md`](docs/10-respostas-confirmacoes-2026-09-10.md) | **Respostas da cliente** — tudo confirmado |
+
+## Estado do código
+
+Descoberta encerrada. **Schema de dados implementado** em
+[`prisma/schema.prisma`](prisma/schema.prisma) — 21 tabelas, validado, com DDL
+gerando limpo, mais o seed das categorias de transporte e dos cadastros já
+conhecidos.
+
+```bash
+npm install
+cp .env.example .env      # preencher DATABASE_URL
+npm run db:migrate        # cria as tabelas
+npm run db:seed           # categorias + frota + motoristas
+```
+
+## Stack
+
+Next.js (App Router) + TypeScript · PostgreSQL + Prisma · shadcn/ui + Tailwind ·
+Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supabase.
 
 ## Próximo passo
 
-Levantamento feito e stack fechada (Next.js + TypeScript + PostgreSQL + Prisma +
-shadcn/ui, deploy Vercel + Railway/Supabase).
-
-Enviar `docs/09-confirmacoes-ana.md` à cliente. Com as respostas, gerar o schema
-e começar pelos cadastros.
+Telas de cadastro (veículos, motoristas, clientes, agregados), depois viagem e
+frete. Pendente da cliente: os XMLs de CT-e, para validar se `infCarga/vCarga`
+traz o valor da nota — o que eliminaria a digitação manual no acerto do agregado.
