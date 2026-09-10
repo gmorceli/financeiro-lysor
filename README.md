@@ -37,9 +37,12 @@ receita e é a maior mudança do planejamento — ver
 | [`docs/06-entrevista-guiada.md`](docs/06-entrevista-guiada.md) | Roteiro de entrevista guiada (já aplicado) |
 | [`docs/07-levantamento-lysor-2026-09-09.md`](docs/07-levantamento-lysor-2026-09-09.md) | **Respostas do cliente.** Entrevista com Ana Veronica, 09/09/2026 |
 | [`docs/08-analise-do-levantamento.md`](docs/08-analise-do-levantamento.md) | **Leia este.** O que o levantamento derrubou, as mudanças no modelo e o follow-up |
+| [`docs/09-confirmacoes-ana.md`](docs/09-confirmacoes-ana.md) | **Enviar à cliente.** Validação do que entendemos + 10 perguntas curtas + arquivos pendentes |
 
 ## Próximo passo
 
-Levantamento feito. Restam **7 confirmações curtas** com a cliente
-(`docs/08-analise-do-levantamento.md` §7) — nenhuma delas bloqueia o início do
-trabalho. Falta fechar a stack (decisão D2) para gerar o schema.
+Levantamento feito e stack fechada (Next.js + TypeScript + PostgreSQL + Prisma +
+shadcn/ui, deploy Vercel + Railway/Supabase).
+
+Enviar `docs/09-confirmacoes-ana.md` à cliente. Com as respostas, gerar o schema
+e começar pelos cadastros.

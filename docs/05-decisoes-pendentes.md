@@ -54,14 +54,18 @@ sistemas — e evita a discussão contábil que trava a entrega.
 
 </details>
 
+### ✅ D2. Stack — **fechada**
+**Decidido:** Next.js (App Router) + TypeScript · PostgreSQL + Prisma ·
+shadcn/ui + Tailwind · Auth.js · storage S3-compatível para anexos ·
+deploy Vercel (app) + Railway/Supabase (Postgres).
+
+Detalhes e justificativa em `01-avaliacao-e-arquitetura.md` §7. O schema pode
+ser gerado assim que as confirmações da cliente chegarem
+(`09-confirmacoes-ana.md`).
+
 ---
 
 ## Decisões nossas — em aberto
-
-### D2. Stack
-Recomendação em `01-avaliacao-e-arquitetura.md` §7: Next.js + TypeScript +
-PostgreSQL + Prisma + shadcn/ui, deploy Vercel + Railway/Supabase.
-Confirmar antes de gerar o schema.
 
 ### D5. Como construir confiança no número (revisto)
 O cliente **não tem controle formalizado hoje**, então o piloto em paralelo que
