@@ -42,9 +42,9 @@ receita e é a maior mudança do planejamento — ver
 
 ## Estado do código
 
-**Cadastros funcionando.** Schema com 21 tabelas, migration aplicada e as cinco
-telas de cadastro — veículos, motoristas, clientes, agregados e fornecedores —
-com listagem, criação e edição.
+**Cadastros e operação funcionando.** Schema com 21 tabelas, migration aplicada,
+as cinco telas de cadastro (veículos, motoristas, clientes, agregados e
+fornecedores) e o fluxo operacional: abrir viagem, lançar frete, fechar viagem.
 
 ```bash
 npm install
@@ -57,10 +57,26 @@ npm run dev               # http://localhost:3000
 Verificações:
 
 ```bash
-npm run typecheck    # tipos
-npm run verificar    # regras de negócio dos cadastros
-npm run build        # build de produção
+npm run typecheck        # tipos
+npm run verificar        # regras de validação dos cadastros
+npm run verificar:fluxo  # fluxo operacional contra o banco
+npm run build            # build de produção
 ```
+
+### O fluxo de operação
+
+1. **Abrir viagem** — escolher o caminhão preenche sozinho o motorista de
+   sempre e a quilometragem de saída. Sobram origem e destino.
+2. **Lançar frete** — o valor real vem preenchido igual ao do CT-e. Quando são
+   iguais, ninguém digita nada; quando não, a tela mostra a diferença e avisa
+   que a comissão segue o valor real.
+3. **Fechar viagem** — a quilometragem de chegada revela o km rodado, e o km
+   vazio sai do que não foi carregado. O odômetro do veículo avança na mesma
+   transação.
+
+Frete de agregado não passa por viagem: o caminhão é dele. A tela calcula a
+comissão e o seguro conforme os valores são digitados, mas quem grava é o
+servidor a partir da regra cadastrada — a tela é conferência, não entrada.
 
 ### Decisões de interface que vieram do levantamento
 
@@ -82,8 +98,8 @@ Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supab
 
 ## Próximo passo
 
-Viagem e frete — a tela do dia a dia, com a meta de fechar uma viagem em menos
-de 60 segundos. Depois custos e o relatório de resultado.
+Custos — abastecimento (com lançamento pelo celular do motorista), manutenção e
+despesas de viagem. Depois os títulos financeiros e o relatório de resultado.
 
 Faltando: **autenticação** (antes de qualquer deploy) e os **XMLs de CT-e** da
 cliente, para validar se `infCarga/vCarga` traz o valor da nota — o que

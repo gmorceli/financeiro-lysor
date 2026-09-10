@@ -1,5 +1,22 @@
 import { clsx, type ClassValue } from 'clsx'
+import type { Route } from 'next'
+import type { Prisma } from '@prisma/client'
 import { twMerge } from 'tailwind-merge'
+
+/**
+ * Valores monetários chegam do Prisma como `Decimal`, e de formulários como
+ * string. As funções de formatação aceitam os três.
+ */
+export type ValorMonetario = number | string | Prisma.Decimal
+
+/**
+ * Rotas montadas em tempo de execução (`/viagens/${id}`) não passam pela
+ * checagem estática do typedRoutes, que só conhece caminhos literais. Este
+ * helper concentra a conversão num lugar só, em vez de espalhar casts.
+ */
+export function rota(caminho: string) {
+  return caminho as Route
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -10,7 +27,7 @@ const FORMATADOR_MOEDA = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL',
 })
 
-export function formatarMoeda(valor: number | string | null | undefined) {
+export function formatarMoeda(valor: ValorMonetario | null | undefined) {
   if (valor === null || valor === undefined || valor === '') return '—'
   return FORMATADOR_MOEDA.format(Number(valor))
 }

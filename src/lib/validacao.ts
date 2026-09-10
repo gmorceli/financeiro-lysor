@@ -170,3 +170,108 @@ export type MotoristaInput = z.infer<typeof motoristaSchema>
 export type ClienteInput = z.infer<typeof clienteSchema>
 export type ProprietarioInput = z.infer<typeof proprietarioSchema>
 export type FornecedorInput = z.infer<typeof fornecedorSchema>
+
+// ---------------------------------------------------------------------------
+// Operação
+// ---------------------------------------------------------------------------
+
+const numeroObrigatorio = (rotulo: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `Informe ${rotulo}`)
+    .transform((v) => Number(v))
+    .refine((v) => Number.isFinite(v), 'Número inválido')
+
+const dataObrigatoria = z
+  .string()
+  .trim()
+  .min(1, 'Informe a data')
+  .transform((v) => new Date(v))
+  .refine((v) => !Number.isNaN(v.getTime()), 'Data inválida')
+
+export const viagemSchema = z.object({
+  veiculoId: z.string().trim().min(1, 'Escolha o caminhão'),
+  motoristaId: z.string().trim().min(1, 'Escolha o motorista'),
+  dataSaida: dataObrigatoria,
+  kmInicial: numeroObrigatorio('a quilometragem de saída').refine(
+    (v) => v >= 0,
+    'Não pode ser negativa',
+  ),
+  origem: z.string().trim().min(2, 'Informe a origem'),
+  destino: z.string().trim().min(2, 'Informe o destino'),
+  observacoes: textoOpcional,
+})
+
+/**
+ * Fechamento da viagem. O km rodado sai da diferença dos odômetros; o operador
+ * informa quanto disso foi carregado e o vazio é o resto.
+ */
+export const fecharViagemSchema = z
+  .object({
+    dataChegada: dataObrigatoria,
+    kmFinal: numeroObrigatorio('a quilometragem de chegada'),
+    kmCarregado: numeroOpcional,
+    kmImprodutivo: numeroOpcional,
+    motivoKmImprodutivo: textoOpcional,
+  })
+  .refine((v) => v.kmCarregado === undefined || v.kmCarregado >= 0, {
+    message: 'Não pode ser negativo',
+    path: ['kmCarregado'],
+  })
+  .refine((v) => v.kmImprodutivo === undefined || !!v.motivoKmImprodutivo, {
+    message: 'Diga o motivo do km rodado a mais',
+    path: ['motivoKmImprodutivo'],
+  })
+
+const freteBase = {
+  clienteId: z.string().trim().min(1, 'Escolha o cliente'),
+  numeroCte: textoOpcional,
+  serie: textoOpcional,
+  chaveCte: textoOpcional,
+  origem: z.string().trim().min(2, 'Informe a origem'),
+  destino: z.string().trim().min(2, 'Informe o destino'),
+  produto: textoOpcional,
+  pesoKg: numeroOpcional,
+  cabecas: numeroOpcional,
+  valorCte: numeroObrigatorio('o valor do CT-e').refine((v) => v >= 0, 'Não pode ser negativo'),
+  valorPedagioDestacado: decimalOpcional,
+  valorIcms: decimalOpcional,
+  dataEmissao: dataObrigatoria,
+  dataEntrega: dataOpcional,
+  observacoes: textoOpcional,
+}
+
+/** Frete rodado por caminhão da Lysor: pertence a uma viagem. */
+export const freteProprioSchema = z.object({
+  ...freteBase,
+  viagemId: z.string().trim().min(1, 'Frete próprio precisa estar em uma viagem'),
+  /**
+   * O valor gerencial. Parte dos CT-e sai pelo mínimo, e é sobre este valor que
+   * a comissão do motorista e o lucro por frete são calculados.
+   */
+  valorFreteReal: numeroObrigatorio('o valor real do frete').refine(
+    (v) => v >= 0,
+    'Não pode ser negativo',
+  ),
+})
+
+/**
+ * Frete rodado por agregado: não há viagem da Lysor. A receita é a comissão
+ * mais o seguro cobrados dele.
+ */
+export const freteAgregadoSchema = z.object({
+  ...freteBase,
+  proprietarioId: z.string().trim().min(1, 'Escolha o agregado'),
+  fluxoFinanceiro: z.enum(['INTERMEDIADO', 'DIRETO']),
+  valorCargaNfe: numeroObrigatorio('o valor da nota fiscal da carga').refine(
+    (v) => v >= 0,
+    'Não pode ser negativo',
+  ),
+  numeroNfe: textoOpcional,
+})
+
+export type ViagemInput = z.infer<typeof viagemSchema>
+export type FecharViagemInput = z.infer<typeof fecharViagemSchema>
+export type FreteProprioInput = z.infer<typeof freteProprioSchema>
+export type FreteAgregadoInput = z.infer<typeof freteAgregadoSchema>

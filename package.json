@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:validate": "prisma validate && prisma format --check",
-    "verificar": "tsx scripts/verificar-regras.ts"
+    "verificar": "tsx scripts/verificar-regras.ts",
+    "verificar:fluxo": "tsx scripts/verificar-fluxo.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
