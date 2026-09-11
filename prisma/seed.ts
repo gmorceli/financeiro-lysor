@@ -9,59 +9,16 @@
  */
 import {
   PrismaClient,
-  TipoLancamento,
-  NivelCusto,
   TipoVeiculo,
   TipoPosse,
   VinculoMotorista,
   ModeloRemuneracao,
   BaseComissao,
 } from '@prisma/client'
+import { CATEGORIAS, EMPRESA } from './dados-base'
 
 const prisma = new PrismaClient()
 
-/** Categorias de transporte. `nivelCusto` define a camada da cascata do DRE. */
-const CATEGORIAS: Array<{
-  nome: string
-  tipo: TipoLancamento
-  nivelCusto: NivelCusto
-}> = [
-  // Receita
-  { nome: 'Receita de frete', tipo: 'RECEITA', nivelCusto: 'DIRETO_VIAGEM' },
-  { nome: 'Comissão de agregado', tipo: 'RECEITA', nivelCusto: 'DIRETO_VIAGEM' },
-  { nome: 'Seguro cobrado de agregado', tipo: 'RECEITA', nivelCusto: 'DIRETO_VIAGEM' },
-
-  // Custo direto da viagem
-  { nome: 'Combustível', tipo: 'DESPESA', nivelCusto: 'DIRETO_VIAGEM' },
-  { nome: 'Pedágio', tipo: 'DESPESA', nivelCusto: 'DIRETO_VIAGEM' },
-  { nome: 'Comissão de motorista', tipo: 'DESPESA', nivelCusto: 'DIRETO_VIAGEM' },
-  { nome: 'Despesa de viagem', tipo: 'DESPESA', nivelCusto: 'DIRETO_VIAGEM' },
-  { nome: 'Repasse a agregado', tipo: 'DESPESA', nivelCusto: 'DIRETO_VIAGEM' },
-
-  // Custo do veículo
-  { nome: 'Manutenção', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-  { nome: 'Pneus', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-  { nome: 'Seguro do veículo', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-  { nome: 'IPVA e licenciamento', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-  { nome: 'ANTT / RNTRC', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-  { nome: 'Financiamento de veículo', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-  { nome: 'Rastreamento', tipo: 'DESPESA', nivelCusto: 'VEICULO' },
-
-  // Overhead
-  { nome: 'Salários e encargos', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-  { nome: 'Contador', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-  { nome: 'Sistemas e software', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-  { nome: 'Internet e telefonia', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-  { nome: 'Seguro RCTR-C', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-  { nome: 'Impostos', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-  { nome: 'Administrativo', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
-]
-
-/**
- * Frota confirmada: 4 cavalos + 2 trucks + 2 carretas.
- * Apelidos vêm das folhas manuscritas — é como a cliente identifica cada um.
- * Placas ficam em branco até o cadastro assistido.
- */
 const VEICULOS: Array<{
   apelido: string
   placa: string
@@ -108,20 +65,9 @@ const REGRA_COBRANCA_AGREGADO = {
 
 async function main() {
   await prisma.empresa.upsert({
-    where: { cnpj: '00.000.000/0001-00' },
+    where: { cnpj: EMPRESA.cnpj },
     update: {},
-    create: {
-      razaoSocial: 'Lysor Transportes LTDA',
-      nomeFantasia: 'Lysor Transportes',
-      cnpj: '00.000.000/0001-00',
-      dataCorte: new Date('2026-09-01'),
-      configRateio: {
-        criterioViagemParaFrete: 'VALOR_FRETE',
-        criterioVeiculoParaViagem: 'KM_RODADO',
-        criterioOverhead: 'PERCENTUAL_RECEITA',
-        incluirDepreciacao: false,
-      },
-    },
+    create: EMPRESA,
   })
 
   for (const categoria of CATEGORIAS) {

@@ -63,6 +63,30 @@ usuários exige estar logado como administrador, e no banco novo não há ningu�
 e nasce provisória: o sistema obriga a trocar no primeiro login. Daí em diante
 o caminho é a tela.
 
+### Deploy
+
+O build de produção roda as migrations e prepara a instalação antes de compilar:
+
+```
+prisma migrate deploy && tsx scripts/preparar-producao.ts && next build
+```
+
+É o único momento do deploy com acesso ao banco — o `npm run usuario` precisa de
+um terminal, e no deploy não existe um. `preparar-producao` cria a empresa,
+garante as 22 categorias (sem elas o DRE não tem onde encaixar lançamento
+nenhum) e, **se a tabela de usuários estiver vazia**, cria o primeiro
+administrador a partir de `ADMIN_EMAIL`, `ADMIN_NOME` e `ADMIN_SENHA`. A trava é
+a contagem de usuários, não o e-mail: a variável pode ficar para trás sem virar
+um jeito de sobrescrever a conta de alguém. Senha fraca derruba o build em vez
+de subir um administrador frágil.
+
+Ele **não** carrega a frota de exemplo do `db:seed`. Veículo não se apaga neste
+sistema — sai de operação mudando de status e continua na lista para sempre.
+Oito caminhões com placa inventada seriam oito linhas para a cliente conviver.
+
+Variáveis necessárias: `DATABASE_URL` e `DIRECT_URL`. Depois do primeiro acesso,
+remova `ADMIN_SENHA` do painel: ela não serve mais para nada.
+
 Verificações — **158 asserções contra um Postgres de verdade**:
 
 ```bash
