@@ -33,6 +33,9 @@ export function Button({
       type={type}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+        // A altura mínima de 44px no toque vem da regra `pointer: coarse` em
+        // globals.css, que vale para todo botão. Repetir aqui criaria duas
+        // fontes para a mesma decisão.
         'focus-visible:outline-2 focus-visible:outline-offset-2',
         'disabled:pointer-events-none disabled:opacity-50',
         VARIANTES_BOTAO[variante],
@@ -45,8 +48,17 @@ export function Button({
 
 // ---------------------------------------------------------------- Campos
 
+/**
+ * `text-base` (16px) no celular não é escolha estética: abaixo de 16px o Safari
+ * do iOS dá zoom sozinho ao focar o campo, e a pessoa perde o resto do
+ * formulário de vista no meio da digitação. No desktop volta para 14px, que é a
+ * densidade que o resto da tela usa.
+ *
+ * A altura de 44px no toque vem da regra `pointer: coarse` em globals.css.
+ */
 const CLASSE_CAMPO =
-  'w-full rounded-lg border border-borda bg-superficie px-3 py-2 text-sm text-texto ' +
+  'w-full rounded-lg border border-borda bg-superficie px-3 py-2 ' +
+  'text-base sm:text-sm text-texto ' +
   'placeholder:text-texto-suave/60 focus:border-primaria focus:outline-none ' +
   'focus:ring-2 focus:ring-primaria/20 disabled:opacity-60'
 
@@ -57,12 +69,17 @@ export const Input = React.forwardRef<
   return <input ref={ref} className={cn(CLASSE_CAMPO, className)} {...props} />
 })
 
+/**
+ * Sem `appearance-none`: ele tirava a seta que o sistema desenha e o campo
+ * ficava idêntico a um campo de texto — nada na tela dizia que ali se escolhe
+ * de uma lista. A seta do próprio aparelho é a que a pessoa já reconhece.
+ */
 export const Select = React.forwardRef<
   HTMLSelectElement,
   React.SelectHTMLAttributes<HTMLSelectElement>
 >(function Select({ className, children, ...props }, ref) {
   return (
-    <select ref={ref} className={cn(CLASSE_CAMPO, 'appearance-none pr-8', className)} {...props}>
+    <select ref={ref} className={cn(CLASSE_CAMPO, 'pr-9', className)} {...props}>
       {children}
     </select>
   )
@@ -83,7 +100,7 @@ export function Checkbox({
     <input
       type="checkbox"
       className={cn(
-        'size-4 rounded border-borda text-primaria focus:ring-2 focus:ring-primaria/20',
+        'size-5 sm:size-4 rounded border-borda text-primaria focus:ring-2 focus:ring-primaria/20',
         className,
       )}
       {...props}
@@ -124,10 +141,17 @@ export function Campo({
 
 // ---------------------------------------------------------------- Estrutura
 
+/**
+ * `min-w-0` importa mais do que parece. Item de grade tem `min-width: auto` por
+ * padrão, então um Card com tabela de 36rem dentro esticava a coluna e fazia a
+ * página inteira rolar de lado no celular — o cabeçalho terminava no meio da
+ * tela e o resto ficava órfão. A tabela já tem rolagem própria; o Card só
+ * precisava parar de crescer junto.
+ */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('rounded-xl border border-borda bg-superficie', className)}
+      className={cn('min-w-0 rounded-xl border border-borda bg-superficie', className)}
       {...props}
     />
   )
@@ -178,11 +202,24 @@ export function Badge({
   )
 }
 
-/** Tabela com rolagem horizontal própria — a página nunca rola de lado. */
-export function Tabela({ children }: { children: React.ReactNode }) {
+/**
+ * Tabela com rolagem horizontal própria — a página nunca rola de lado.
+ *
+ * `minimo` existe porque 36rem é o certo para as tabelas largas do financeiro e
+ * o errado para uma de três colunas: no celular ela empurrava a coluna de valor
+ * para fora da tela, e a pessoa via a data e o nome mas não via quanto era.
+ * Tabela curta usa `min-w-0` e cabe inteira.
+ */
+export function Tabela({
+  children,
+  minimo = 'min-w-[36rem]',
+}: {
+  children: React.ReactNode
+  minimo?: string
+}) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[36rem] border-collapse text-sm">{children}</table>
+      <table className={cn('w-full border-collapse text-sm', minimo)}>{children}</table>
     </div>
   )
 }
@@ -198,6 +235,17 @@ export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
     />
   )
 }
+
+/**
+ * Link dentro de célula de tabela.
+ *
+ * Um `<a>` solto numa célula tem a altura do texto — 16px. Numa lista de
+ * caminhões no celular, isso é pedir para a pessoa acertar uma linha de um
+ * milímetro e meio com o polegar. A margem negativa come o `py-3` da própria
+ * célula, então o alvo passa a ocupar a linha inteira sem que a tabela cresça.
+ */
+export const LINK_TABELA =
+  '-my-3 inline-flex min-h-11 items-center font-medium text-primaria hover:underline sm:my-0 sm:min-h-0'
 
 export function Td({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return <td className={cn('border-b border-borda px-4 py-3 align-middle', className)} {...props} />

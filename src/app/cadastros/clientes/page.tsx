@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatarCpfCnpj } from '@/lib/utils'
-import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, Tabela, Td, Th } from '@/components/ui'
+import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, LINK_TABELA, Tabela, Td, Th } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,7 +47,7 @@ export default async function ListaClientes() {
                   <Td>
                     <Link
                       href={`/cadastros/clientes/${cliente.id}`}
-                      className="font-medium text-primaria hover:underline"
+                      className={LINK_TABELA}
                     >
                       {cliente.nomeFantasia || cliente.razaoSocial}
                     </Link>

@@ -147,7 +147,7 @@ export function FormularioMotorista({
               />
             </Campo>
 
-            <label className="flex items-center gap-2 self-end text-sm text-texto">
+            <label className="flex min-h-11 items-center gap-2 self-end text-sm text-texto">
               <input type="hidden" name="ativo" value="false" />
               <Checkbox name="ativo" value="true" defaultChecked={motorista?.ativo ?? true} />
               Motorista ativo

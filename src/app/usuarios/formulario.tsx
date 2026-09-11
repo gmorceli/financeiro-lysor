@@ -78,7 +78,7 @@ export function FormularioUsuario({
             </Select>
           </Campo>
 
-          <label className="flex items-center gap-2">
+          <label className="flex min-h-11 items-center gap-2">
             {/* Checkbox desmarcado não é enviado; o hidden garante o "false". */}
             <input type="hidden" name="ativo" value="false" />
             <Checkbox name="ativo" value="true" defaultChecked={usuario?.ativo ?? true} />

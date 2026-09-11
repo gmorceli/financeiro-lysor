@@ -76,15 +76,22 @@ npm run verificar:auth    # senha, sessão, bloqueio, permissão e guarda das ac
 npm run build             # build de produção
 ```
 
-E mais 29 asserções no navegador, que exigem o servidor no ar e o Chromium
-instalado (por isso o Playwright não está em `package.json` — ele baixaria um
-navegador de ~150 MB em toda instalação, inclusive na do deploy):
+E mais duas verificações que exigem o servidor no ar e o Chromium instalado
+(por isso o Playwright não está em `package.json` — ele baixaria um navegador de
+~150 MB em toda instalação, inclusive na do deploy):
 
 ```bash
 npm i -D playwright && npx playwright install chromium
 npm run build && npm start
-npm run verificar:navegador
+npm run verificar:navegador   # 29 asserções no formulário de verdade
+npm run verificar:mobile      # as 27 telas medidas em 375px
 ```
+
+`verificar:mobile` é o que impede a promessa fácil de "é responsivo". Ele mede,
+em cada tela, se a página rola de lado, se algum campo tem fonte abaixo de 16px
+(aí o Safari do iOS dá zoom ao focar e a pessoa perde o formulário de vista), se
+algum alvo de toque está abaixo de 40px e se algo estoura a largura. Na primeira
+execução, 27 de 27 telas falharam.
 
 ### O fluxo de operação
 

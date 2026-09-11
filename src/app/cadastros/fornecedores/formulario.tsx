@@ -42,7 +42,7 @@ export function FormularioFornecedor({ fornecedor }: { fornecedor?: Fornecedor }
             <Campo label="Telefone" erro={erros.telefone}>
               <Input name="telefone" type="tel" defaultValue={fornecedor?.telefone ?? ''} />
             </Campo>
-            <label className="flex items-center gap-2 self-end text-sm text-texto">
+            <label className="flex min-h-11 items-center gap-2 self-end text-sm text-texto">
               <input type="hidden" name="ativo" value="false" />
               <Checkbox name="ativo" value="true" defaultChecked={fornecedor?.ativo ?? true} />
               Fornecedor ativo

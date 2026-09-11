@@ -1,16 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatarCpfCnpj, formatarData, formatarMoeda } from '@/lib/utils'
-import {
-  Badge,
-  Button,
-  CabecalhoPagina,
-  Card,
-  EstadoVazio,
-  Tabela,
-  Td,
-  Th,
-} from '@/components/ui'
+import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, LINK_TABELA, Tabela, Td, Th } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,7 +71,7 @@ export default async function ListaMotoristas() {
                     <Td>
                       <Link
                         href={`/cadastros/motoristas/${motorista.id}`}
-                        className="font-medium text-primaria hover:underline"
+                        className={LINK_TABELA}
                       >
                         {motorista.nome}
                       </Link>

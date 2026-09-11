@@ -66,8 +66,8 @@ export default async function ListaFretes({
               href={rota(aba.valor ? `/fretes?modalidade=${aba.valor}` : '/fretes')}
               className={
                 ativo
-                  ? 'rounded-lg bg-primaria px-3 py-1.5 text-sm font-medium text-white'
-                  : 'rounded-lg px-3 py-1.5 text-sm text-texto-suave hover:bg-superficie'
+                  ? 'flex min-h-11 items-center rounded-lg bg-primaria px-3 text-sm font-medium text-white sm:min-h-9'
+                  : 'flex min-h-11 items-center rounded-lg px-3 text-sm text-texto-suave hover:bg-superficie sm:min-h-9'
               }
             >
               {aba.rotulo}
@@ -126,12 +126,12 @@ export default async function ListaFretes({
                           </span>
                         </span>
                       ) : (
-                        <span className="text-texto-suave">
+                        <span className="flex flex-wrap items-center gap-x-1 text-texto-suave">
                           {frete.viagem?.veiculo.apelido ?? '—'}
                           {frete.viagem && (
                             <Link
                               href={rota(`/viagens/${frete.viagemId}`)}
-                              className="ml-1 text-primaria hover:underline"
+                              className="-my-3 inline-flex min-h-11 items-center text-primaria hover:underline sm:my-0 sm:min-h-0"
                             >
                               (viagem {frete.viagem.numero})
                             </Link>

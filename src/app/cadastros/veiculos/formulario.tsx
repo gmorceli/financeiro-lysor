@@ -153,7 +153,7 @@ export function FormularioVeiculo({
 
             <div className="flex flex-col gap-2 sm:col-span-2">
               <span className="text-sm font-medium text-texto">Isenções</span>
-              <label className="flex items-center gap-2 text-sm text-texto">
+              <label className="flex min-h-11 items-center gap-2 text-sm text-texto">
                 <input type="hidden" name="isentoIpva" value="false" />
                 <Checkbox
                   name="isentoIpva"
@@ -162,7 +162,7 @@ export function FormularioVeiculo({
                 />
                 Isento de IPVA
               </label>
-              <label className="flex items-center gap-2 text-sm text-texto">
+              <label className="flex min-h-11 items-center gap-2 text-sm text-texto">
                 <input type="hidden" name="isentoLicenciamento" value="false" />
                 <Checkbox
                   name="isentoLicenciamento"

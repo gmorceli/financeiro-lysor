@@ -8,7 +8,7 @@ import { sair } from './conta/actions'
 function BotaoSair() {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" variante="discreto" className="px-2 py-1 text-sm" disabled={pending}>
+    <Button type="submit" variante="discreto" className="px-3 text-sm" disabled={pending}>
       {pending ? 'Saindo…' : 'Sair'}
     </Button>
   )
@@ -25,7 +25,7 @@ export function MenuDoUsuario({ nome, perfil }: { nome: string; perfil: string }
     <div className="flex items-center gap-1">
       <Link
         href="/conta/senha"
-        className="hidden rounded-lg px-2 py-1 text-right text-sm leading-tight text-texto-suave transition-colors hover:bg-fundo hover:text-texto sm:block"
+        className="hidden min-h-11 flex-col justify-center rounded-lg px-2 text-right text-sm leading-tight text-texto-suave transition-colors hover:bg-fundo hover:text-texto sm:flex sm:min-h-0"
         title="Trocar senha"
       >
         <span className="block font-medium text-texto">{primeiroNome}</span>
@@ -33,7 +33,7 @@ export function MenuDoUsuario({ nome, perfil }: { nome: string; perfil: string }
       </Link>
       <Link
         href="/conta/senha"
-        className="rounded-lg px-2 py-1 text-sm text-texto-suave transition-colors hover:bg-fundo hover:text-texto sm:hidden"
+        className="flex min-h-11 items-center rounded-lg px-2 text-sm text-texto-suave transition-colors hover:bg-fundo hover:text-texto sm:hidden"
       >
         {primeiroNome}
       </Link>

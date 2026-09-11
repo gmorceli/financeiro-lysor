@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, Tabela, Td, Th } from '@/components/ui'
+import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, LINK_TABELA, Tabela, Td, Th } from '@/components/ui'
 import { ROTULOS_PERFIL } from '@/lib/permissoes'
 import { usuarioDaSessao } from '@/lib/sessao'
 import { formatarData, rota } from '@/lib/utils'
@@ -48,7 +48,7 @@ export default async function PaginaUsuarios() {
                   <Td>
                     <Link
                       href={rota(`/usuarios/${usuario.id}`)}
-                      className="font-medium text-primaria hover:underline"
+                      className={LINK_TABELA}
                     >
                       {usuario.nome}
                     </Link>

@@ -166,7 +166,7 @@ export function FormularioAbastecimento({
               </Select>
             </Campo>
 
-            <label className="flex items-center gap-2 self-end text-sm text-texto">
+            <label className="flex min-h-11 items-center gap-2 self-end text-sm text-texto">
               <input type="hidden" name="tanqueCheio" value="false" />
               <Checkbox
                 name="tanqueCheio"

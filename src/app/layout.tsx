@@ -31,7 +31,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <>
             <header className="border-b border-borda bg-superficie">
               <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-                <Link href="/" className="text-sm font-semibold tracking-tight text-primaria">
+                <Link
+                  href="/"
+                  className="-ml-2 flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold tracking-tight text-primaria sm:min-h-0"
+                >
                   Lysor Transportes
                 </Link>
                 <MenuDoUsuario nome={usuario.nome} perfil={ROTULOS_PERFIL[usuario.perfil]} />
@@ -43,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       <li key={item.href}>
                         <Link
                           href={rota(item.href)}
-                          className="block rounded-lg px-3 py-1.5 text-sm text-texto-suave transition-colors hover:bg-fundo hover:text-texto"
+                          className="flex min-h-11 items-center rounded-lg px-3 py-1.5 text-sm text-texto-suave transition-colors hover:bg-fundo hover:text-texto sm:min-h-0"
                         >
                           {item.rotulo}
                         </Link>

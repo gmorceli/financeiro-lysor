@@ -22,7 +22,8 @@
     "verificar:financeiro": "tsx scripts/verificar-financeiro.ts",
     "verificar:resultado": "tsx scripts/verificar-resultado.ts",
     "verificar:auth": "tsx scripts/verificar-auth.ts",
-    "verificar:navegador": "tsx scripts/verificar-navegador.ts"
+    "verificar:navegador": "tsx scripts/verificar-navegador.ts",
+    "verificar:mobile": "tsx scripts/verificar-mobile.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

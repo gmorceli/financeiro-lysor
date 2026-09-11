@@ -1,16 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatarData, formatarMoeda, formatarNumero, rota } from '@/lib/utils'
-import {
-  Badge,
-  Button,
-  CabecalhoPagina,
-  Card,
-  EstadoVazio,
-  Tabela,
-  Td,
-  Th,
-} from '@/components/ui'
+import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, LINK_TABELA, Tabela, Td, Th } from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,7 +86,7 @@ export default async function ListaViagens() {
                     <Td className="tabular-nums">
                       <Link
                         href={rota(`/viagens/${viagem.id}`)}
-                        className="font-medium text-primaria hover:underline"
+                        className={LINK_TABELA}
                       >
                         {viagem.numero}
                       </Link>

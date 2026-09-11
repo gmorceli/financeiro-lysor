@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { exigirUsuario } from '@/lib/sessao'
 import { podeAcessar } from '@/lib/permissoes'
 import { formatarMoeda, rota } from '@/lib/utils'
-import { Badge, Button, CabecalhoPagina, Card, Tabela, Td, Th } from '@/components/ui'
+import { Badge, Button, CabecalhoPagina, Card, LINK_TABELA, Tabela, Td, Th } from '@/components/ui'
 import { EM_ABERTO, emDias, hojeUtc, resumoFinanceiro } from './financeiro/consultas'
 
 export const dynamic = 'force-dynamic'
@@ -87,19 +87,81 @@ export default async function Inicio() {
         }
       />
 
+      {((resumo?.vencidosPagarQtd ?? 0) > 0 ||
+        (resumo?.vencidosReceberQtd ?? 0) > 0 ||
+        incompletas > 0) && (
+        <Card className="mb-4 border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-sm font-semibold text-alerta">Precisa de atenção</h2>
+          {/*
+            A linha inteira é o link, não um trecho da frase.
+            Este cartão é o que a cliente abre às cinco da manhã e é por ele que
+            ela entra no sistema — deixar o alvo do tamanho de duas palavras no
+            meio de um parágrafo é o pior lugar possível para economizar pixel.
+          */}
+          <ul className="mt-1 text-sm text-texto">
+            {resumo && resumo.vencidosPagarQtd > 0 && (
+              <li>
+                <Link
+                  href="/financeiro/pagar"
+                  className="-mx-2 flex min-h-11 items-center rounded-lg px-2 hover:bg-amber-100/60"
+                >
+                  <span className="font-medium text-primaria">
+                    {resumo.vencidosPagarQtd} conta{resumo.vencidosPagarQtd === 1 ? '' : 's'} a
+                    pagar vencida{resumo.vencidosPagarQtd === 1 ? '' : 's'}
+                  </span>
+                  <span className="ml-1">— {formatarMoeda(resumo.vencidosPagar)}</span>
+                </Link>
+              </li>
+            )}
+            {resumo && resumo.vencidosReceberQtd > 0 && (
+              <li>
+                <Link
+                  href="/financeiro/receber"
+                  className="-mx-2 flex min-h-11 items-center rounded-lg px-2 hover:bg-amber-100/60"
+                >
+                  <span className="font-medium text-primaria">
+                    {resumo.vencidosReceberQtd} recebimento
+                    {resumo.vencidosReceberQtd === 1 ? '' : 's'} em atraso
+                  </span>
+                  <span className="ml-1">— {formatarMoeda(resumo.vencidosReceber)}</span>
+                </Link>
+              </li>
+            )}
+            {incompletas > 0 && (
+              <li>
+                <Link
+                  href="/viagens"
+                  className="-mx-2 flex min-h-11 items-center rounded-lg px-2 hover:bg-amber-100/60"
+                >
+                  <span className="font-medium text-primaria">
+                    {incompletas} viagem{incompletas === 1 ? '' : 'ns'} sem frete lançado
+                  </span>
+                  <span className="ml-1 text-texto-suave">— receita ficando para trás</span>
+                </Link>
+              </li>
+            )}
+          </ul>
+        </Card>
+      )}
+
       {indicadores.length > 0 && (
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid gap-2 sm:grid-cols-3 sm:gap-3">
         {indicadores.map((indicador) => (
           <Link key={indicador.rotulo} href={indicador.href} className="group">
-            <Card className="h-full p-4 transition-colors group-hover:border-primaria/40">
+            {/*
+              No celular cada indicador é uma linha — rótulo à esquerda, valor à
+              direita. Em três colunas a 375px "R$ 30.611,07" não cabe: o valor
+              vazava do cartão e o sinal de menos caía para a linha de cima.
+            */}
+            <Card className="flex h-full items-baseline justify-between gap-2 p-3 transition-colors group-hover:border-primaria/40 sm:block sm:p-4">
               <p className="text-sm text-texto-suave">{indicador.rotulo}</p>
               <p
                 className={
                   indicador.destaque && indicador.valor < 0
-                    ? 'mt-1 text-2xl font-semibold tabular-nums text-erro'
+                    ? 'whitespace-nowrap text-lg font-semibold tabular-nums text-erro sm:mt-1 sm:text-2xl'
                     : indicador.destaque
-                      ? 'mt-1 text-2xl font-semibold tabular-nums text-primaria'
-                      : 'mt-1 text-2xl font-semibold tabular-nums text-texto'
+                      ? 'whitespace-nowrap text-lg font-semibold tabular-nums text-primaria sm:mt-1 sm:text-2xl'
+                      : 'whitespace-nowrap text-lg font-semibold tabular-nums text-texto sm:mt-1 sm:text-2xl'
                 }
               >
                 {formatarMoeda(indicador.valor)}
@@ -108,42 +170,6 @@ export default async function Inicio() {
           </Link>
         ))}
       </div>
-      )}
-
-      {((resumo?.vencidosPagarQtd ?? 0) > 0 ||
-        (resumo?.vencidosReceberQtd ?? 0) > 0 ||
-        incompletas > 0) && (
-        <Card className="mb-4 border-amber-200 bg-amber-50 p-4">
-          <h2 className="text-sm font-semibold text-alerta">Precisa de atenção</h2>
-          <ul className="mt-2 space-y-1 text-sm text-texto">
-            {resumo && resumo.vencidosPagarQtd > 0 && (
-              <li>
-                <Link href="/financeiro/pagar" className="text-primaria hover:underline">
-                  {resumo.vencidosPagarQtd} conta{resumo.vencidosPagarQtd === 1 ? '' : 's'} a
-                  pagar vencida{resumo.vencidosPagarQtd === 1 ? '' : 's'}
-                </Link>{' '}
-                — {formatarMoeda(resumo.vencidosPagar)}
-              </li>
-            )}
-            {resumo && resumo.vencidosReceberQtd > 0 && (
-              <li>
-                <Link href="/financeiro/receber" className="text-primaria hover:underline">
-                  {resumo.vencidosReceberQtd} recebimento
-                  {resumo.vencidosReceberQtd === 1 ? '' : 's'} em atraso
-                </Link>{' '}
-                — {formatarMoeda(resumo.vencidosReceber)}
-              </li>
-            )}
-            {incompletas > 0 && (
-              <li>
-                <Link href="/viagens" className="text-primaria hover:underline">
-                  {incompletas} viagem{incompletas === 1 ? '' : 'ns'} sem frete lançado
-                </Link>{' '}
-                — receita que pode estar ficando para trás
-              </li>
-            )}
-          </ul>
-        </Card>
       )}
 
       <div className={veFinanceiro ? 'grid gap-4 lg:grid-cols-2' : 'grid gap-4'}>
@@ -155,7 +181,7 @@ export default async function Inicio() {
           {vencendo.length === 0 ? (
             <p className="px-4 py-6 text-sm text-texto-suave">Nada vencendo esta semana.</p>
           ) : (
-            <Tabela>
+            <Tabela minimo="min-w-0">
               <thead>
                 <tr>
                   <Th>Vence</Th>
@@ -187,11 +213,11 @@ export default async function Inicio() {
                       <Td
                         className={
                           titulo.tipo === 'RECEITA'
-                            ? 'text-right tabular-nums text-primaria'
-                            : 'text-right tabular-nums text-texto'
+                            ? 'whitespace-nowrap text-right tabular-nums text-primaria'
+                            : 'whitespace-nowrap text-right tabular-nums text-texto'
                         }
                       >
-                        {titulo.tipo === 'RECEITA' ? '+' : '−'}{' '}
+                        {titulo.tipo === 'RECEITA' ? '+' : '−'}&nbsp;
                         {formatarMoeda(Number(titulo.valor) - Number(titulo.valorPago))}
                       </Td>
                     </tr>
@@ -227,7 +253,7 @@ export default async function Inicio() {
                     <Td className="tabular-nums">
                       <Link
                         href={rota(`/viagens/${viagem.id}`)}
-                        className="font-medium text-primaria hover:underline"
+                        className={LINK_TABELA}
                       >
                         {viagem.numero}
                       </Link>

@@ -44,7 +44,7 @@ export function FormularioCliente({ cliente }: { cliente?: Cliente }) {
             <Campo label="E-mail" erro={erros.email}>
               <Input name="email" type="email" defaultValue={cliente?.email ?? ''} />
             </Campo>
-            <label className="flex items-center gap-2 self-end text-sm text-texto">
+            <label className="flex min-h-11 items-center gap-2 self-end text-sm text-texto">
               <input type="hidden" name="ativo" value="false" />
               <Checkbox name="ativo" value="true" defaultChecked={cliente?.ativo ?? true} />
               Cliente ativo

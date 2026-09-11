@@ -118,7 +118,7 @@ export function FormularioAgregado({ agregado }: { agregado?: Proprietario }) {
               </p>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-texto">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-texto">
               <input type="hidden" name="ativo" value="false" />
               <Checkbox name="ativo" value="true" defaultChecked={agregado?.ativo ?? true} />
               Agregado ativo
