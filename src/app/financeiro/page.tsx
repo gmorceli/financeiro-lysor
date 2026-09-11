@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatarMoeda } from '@/lib/utils'
-import { Badge, CabecalhoPagina, Card, Tabela, Td, Th } from '@/components/ui'
+import { Badge, Button, CabecalhoPagina, Card, Tabela, Td, Th } from '@/components/ui'
 import { EM_ABERTO, hojeUtc, resumoFinanceiro } from './consultas'
 
 export const dynamic = 'force-dynamic'
@@ -77,6 +77,16 @@ export default async function PainelFinanceiro() {
       <CabecalhoPagina
         titulo="Financeiro"
         descricao="Contas a pagar, a receber e o que está por vencer."
+        acao={
+          <div className="flex flex-wrap items-center gap-2">
+            <a href="/financeiro/exportar?abertos=sim" download>
+              <Button variante="secundario">Excel do que está em aberto</Button>
+            </a>
+            <a href="/financeiro/exportar" download>
+              <Button variante="secundario">Tudo</Button>
+            </a>
+          </div>
+        }
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-3">

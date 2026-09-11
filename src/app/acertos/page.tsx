@@ -185,6 +185,7 @@ export default async function Acertos() {
                 <Th>Quem</Th>
                 <Th>Período</Th>
                 <Th className="text-right">Valor</Th>
+                <Th className="text-right">Papel</Th>
               </tr>
             </thead>
             <tbody>
@@ -204,6 +205,15 @@ export default async function Acertos() {
                   </Td>
                   <Td className="whitespace-nowrap text-right tabular-nums font-medium text-texto">
                     {formatarMoeda(a.valorLiquido)}
+                  </Td>
+                  <Td className="text-right">
+                    <a
+                      href={`/acertos/${a.id}/exportar`}
+                      download
+                      className="-my-3 inline-flex min-h-11 items-center text-primaria hover:underline sm:my-0 sm:min-h-0"
+                    >
+                      Excel
+                    </a>
                   </Td>
                 </tr>
               ))}

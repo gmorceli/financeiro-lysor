@@ -24,6 +24,7 @@
     "verificar:resultado": "tsx scripts/verificar-resultado.ts",
     "verificar:acertos": "tsx scripts/verificar-acertos.ts",
     "verificar:importacao": "tsx scripts/verificar-importacao.ts",
+    "verificar:planilhas": "tsx scripts/verificar-planilhas.ts",
     "verificar:auth": "tsx scripts/verificar-auth.ts",
     "verificar:navegador": "tsx scripts/verificar-navegador.ts",
     "verificar:mobile": "tsx scripts/verificar-mobile.ts"
@@ -35,6 +36,7 @@
     "@prisma/client": "^6.1.0",
     "@tailwindcss/postcss": "^4.3.3",
     "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.11.1",
     "lucide-react": "^1.44.0",
     "next": "^15.1.0",

@@ -20,6 +20,16 @@ export function middleware(requisicao: NextRequest) {
     return NextResponse.next()
   }
 
+  /**
+   * Download não se redireciona.
+   *
+   * Com sessão vencida, o 307 para o login faria o navegador salvar a tela de
+   * login com nome de arquivo `.xlsx` — e o Excel abriria reclamando de
+   * planilha corrompida, sem ninguém entender que o problema era a sessão. A
+   * rota responde 401 e o download simplesmente falha, que é o certo.
+   */
+  if (pathname.endsWith('/exportar')) return NextResponse.next()
+
   if (requisicao.cookies.has(NOME_COOKIE)) return NextResponse.next()
 
   const login = new URL('/entrar', requisicao.url)

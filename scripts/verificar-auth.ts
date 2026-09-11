@@ -336,11 +336,16 @@ async function main() {
   const PUBLICAS = new Set(['entrar'])
   const PROPRIA_CONTA = new Set(['sair', 'trocarSenha'])
   const arquivos: string[] = []
+  const rotas: string[] = []
   ;(function varrer(dir: string) {
     for (const nome of readdirSync(dir)) {
       const caminho = join(dir, nome)
       if (statSync(caminho).isDirectory()) varrer(caminho)
       else if (nome === 'actions.ts') arquivos.push(caminho)
+      // Route Handler é endpoint HTTP igual a Server Action, e por um tempo
+      // esta varredura só olhava as actions — um download de planilha teria
+      // passado sem guarda nenhuma.
+      else if (nome === 'route.ts') rotas.push(caminho)
     }
   })('src/app')
 
@@ -365,6 +370,26 @@ async function main() {
     'toda action exige sessão antes de escrever',
     desprotegidas.length === 0,
     desprotegidas.length ? `sem guarda: ${desprotegidas.join(', ')}` : 'nenhuma exceção',
+  )
+
+  // --- Route Handler também é porta de entrada ---------------------------
+  const rotasSemGuarda: string[] = []
+  let metodos = 0
+  for (const caminho of rotas) {
+    const texto = readFileSync(caminho, 'utf8')
+    for (const metodo of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']) {
+      const bloco = texto.split(new RegExp(`export async function ${metodo}\\b`))[1]
+      if (bloco === undefined) continue
+      metodos++
+      if (!/exigirAcessoNaRota\(|exigirUsuario\(|usuarioDaSessao\(/.test(bloco)) {
+        rotasSemGuarda.push(`${caminho}:${metodo}`)
+      }
+    }
+  }
+  checar(
+    `toda rota de download exige sessão (${rotas.length} arquivo(s), ${metodos} método(s))`,
+    rotasSemGuarda.length === 0,
+    rotasSemGuarda.length ? `sem guarda: ${rotasSemGuarda.join(', ')}` : 'nenhuma exceção',
   )
 
   // Guarda de área em toda pasta de primeiro nível que não seja pública.

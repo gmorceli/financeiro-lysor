@@ -44,6 +44,13 @@ export default async function Relatorios({
             <Link href={`/relatorios/fretes?mes=${valorSeletor}`}>
               <Button variante="secundario">Por frete</Button>
             </Link>
+            {/*
+              Link comum, não botão com ação: download é uma requisição GET, e o
+              navegador cuida dele sem passar pelo roteador do Next.
+            */}
+            <a href={`/relatorios/exportar?mes=${valorSeletor}`} download>
+              <Button variante="secundario">Excel</Button>
+            </a>
           </div>
         }
       />

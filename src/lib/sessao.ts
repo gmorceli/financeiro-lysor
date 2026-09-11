@@ -65,6 +65,33 @@ export async function exigirAcesso(area: Area): Promise<UsuarioLogado> {
   return usuario
 }
 
+/**
+ * Guarda para Route Handler — download de planilha, por exemplo.
+ *
+ * Separado do `exigirAcesso` porque ali a resposta é um `redirect`, e redirecionar
+ * um download devolve a tela de login com nome de arquivo `.xlsx`: o Excel abre
+ * e reclama que a planilha está corrompida, e ninguém entende que o problema era
+ * a sessão. Aqui a recusa é status, não navegação.
+ *
+ * Devolve `{ usuario }` quando pode seguir, ou `{ resposta }` para o handler
+ * devolver direto.
+ */
+export async function exigirAcessoNaRota(
+  area: Area,
+): Promise<{ usuario: UsuarioLogado; resposta?: never } | { usuario?: never; resposta: Response }> {
+  const usuario = await usuarioDaSessao()
+  if (!usuario) {
+    return { resposta: new Response('Faça login para baixar.', { status: 401 }) }
+  }
+  if (usuario.trocarSenha) {
+    return { resposta: new Response('Troque a senha provisória antes.', { status: 403 }) }
+  }
+  if (!podeAcessar(usuario.perfil, area)) {
+    return { resposta: new Response('Essa parte não é do seu perfil.', { status: 403 }) }
+  }
+  return { usuario }
+}
+
 async function origemDaRequisicao() {
   const cabecalhos = await headers()
   return {

@@ -99,7 +99,7 @@ senha, essa porta fecha para sempre e trocar e-mail passa a ser pela tela.
 Variáveis necessárias: `DATABASE_URL` e `DIRECT_URL`. Depois do primeiro acesso,
 remova `ADMIN_SENHA` do painel: ela não serve mais para nada.
 
-Verificações — **233 asserções contra um Postgres de verdade**:
+Verificações — **262 asserções contra um Postgres de verdade**:
 
 ```bash
 npm run typecheck         # tipos
@@ -110,6 +110,7 @@ npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
 npm run verificar:resultado   # cascata do DRE e rateio por frete
 npm run verificar:acertos     # acerto de motorista e de agregado
 npm run verificar:importacao  # leitura do MDF-e e importação de frete
+npm run verificar:planilhas   # as exportações para Excel, abrindo o arquivo gerado
 npm run verificar:auth    # senha, sessão, bloqueio, permissão e guarda das actions
 npm run build             # build de produção
 ```
@@ -226,6 +227,37 @@ o rateio não perde nem inventa dinheiro.
   conferir o percentual e o seguro na hora de cadastrar.
 - **Nada é apagado**: veículo sai de operação mudando de status, porque carrega
   histórico de viagem e de custo.
+
+### Exportação para Excel
+
+`.xlsx` de verdade, não CSV. CSV em português é uma armadilha de três pontas: o
+Excel brasileiro espera ponto e vírgula, vírgula decimal e BOM, e errar qualquer
+um joga a planilha inteira numa coluna só.
+
+A regra que o teste cobra é **número é número**. Valor vai como número com
+formato de moeda aplicado na célula, nunca como texto `"R$ 1.234,56"` — texto
+que parece dinheiro é o motivo de a soma dar zero. Data vai como data. O teste
+gera o arquivo, **abre de volta** e confere o tipo de cada célula, além de o
+total bater com o que a tela mostra.
+
+Três exportações: o resultado do mês (cascata, por caminhão e por frete), o
+financeiro (a pagar e a receber) e o acerto fechado — o papel que ia na mão do
+motorista ou do agregado.
+
+Duas decisões de recusa, ambas verificadas:
+
+- **Acerto só exporta depois de fechado.** Enquanto está aberto o número ainda
+  muda, e um papel com valor que depois mudou é pior que papel nenhum: alguém
+  guarda e cobra por ele.
+- **Título sem vencimento fica com a data em branco**, e a situação diz "espera
+  o cliente pagar". Inventar data viraria compromisso marcado numa planilha que
+  alguém vai usar para decidir pagamento.
+
+Rota de download é endpoint HTTP igual a Server Action, e o `verificar:auth`
+passou a varrer `route.ts` também. O middleware deixa `/exportar` passar sem
+redirecionar: com sessão vencida, o 307 para o login faria o navegador salvar a
+tela de login com nome `.xlsx`, e o Excel abriria reclamando de arquivo
+corrompido sem ninguém entender que era a sessão. A rota responde 401.
 
 ### Importação de MDF-e
 
