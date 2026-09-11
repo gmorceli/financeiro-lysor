@@ -9,10 +9,11 @@
  * receita da operação de agregado quebrou.
  */
 import { veiculoSchema, motoristaSchema, proprietarioSchema } from '../src/lib/validacao'
+import { somarMeses } from '../src/lib/calculos'
 
 let falhas = 0
-function checar(nome: string, condicao: boolean) {
-  console.log(`${condicao ? '  ok  ' : ' FALHA'} ${nome}`)
+function checar(nome: string, condicao: boolean, detalhe = '') {
+  console.log(`${condicao ? '  ok  ' : ' FALHA'} ${nome}${detalhe ? ` — ${detalhe}` : ''}`)
   if (!condicao) falhas++
 }
 
@@ -91,6 +92,39 @@ const a2 = proprietarioSchema.safeParse({
   quemPagaCombustivel: 'AGREGADO', quemPagaPedagio: 'AGREGADO', ativo: 'true',
 })
 checar('percentual acima de 100 é rejeitado', !a2.success)
+
+
+// ---------------------------------------------------------------------------
+// Parcelamento no fim do mês
+// ---------------------------------------------------------------------------
+// `setMonth` transborda: 31/01 + 1 mês dá 03/03, e a parcela seguinte volta
+// para 31/03. Uma manutenção parcelada lançada dia 31 saía com um vencimento
+// no mês errado.
+const trintaEUm = new Date(Date.UTC(2026, 0, 31))
+const emFevereiro = somarMeses(trintaEUm, 1)
+checar(
+  '31/01 + 1 mês cai em 28/02, não em março',
+  emFevereiro.toISOString().slice(0, 10) === '2026-02-28',
+  emFevereiro.toISOString().slice(0, 10),
+)
+checar(
+  'e o mês seguinte volta para o dia 31',
+  somarMeses(trintaEUm, 2).toISOString().slice(0, 10) === '2026-03-31',
+  somarMeses(trintaEUm, 2).toISOString().slice(0, 10),
+)
+checar(
+  'ano bissexto entra na conta',
+  somarMeses(new Date(Date.UTC(2028, 0, 31)), 1).toISOString().slice(0, 10) === '2028-02-29',
+)
+checar(
+  'virada de ano soma certo',
+  somarMeses(new Date(Date.UTC(2026, 10, 30)), 3).toISOString().slice(0, 10) === '2027-02-28',
+)
+checar(
+  'doze parcelas a partir de 31/01 nunca saem do mês esperado',
+  Array.from({ length: 12 }, (_, i) => somarMeses(trintaEUm, i).getUTCMonth()).join(',') ===
+    '0,1,2,3,4,5,6,7,8,9,10,11',
+)
 
 console.log(falhas === 0 ? '\nTodos os testes passaram.' : `\n${falhas} teste(s) falharam.`)
 process.exit(falhas === 0 ? 0 : 1)

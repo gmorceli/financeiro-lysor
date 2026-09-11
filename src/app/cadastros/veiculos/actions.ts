@@ -29,9 +29,21 @@ export async function salvarVeiculo(
     proprietarioId: dados.tipoPosse === 'AGREGADO' ? proprietarioId : null,
   }
 
+  /*
+    Odômetro é número acumulado, e o formulário edita o cadastro inteiro. Sair
+    do campo em branco numa edição qualquer não pode zerar 900.000 km — e
+    zerava, porque o `?? 0` valia também para o update. Pior: com o odômetro em
+    zero a trava de "km só sobe" do lançamento de manutenção passa a aceitar
+    qualquer leitura. Em branco na edição significa "não mexi nisso".
+  */
+  const paraGravar =
+    id && dados.tipo !== 'CARRETA' && dados.odometroAtual == null
+      ? (({ odometroAtual: _, ...resto }) => resto)(payload)
+      : payload
+
   try {
     if (id) {
-      await prisma.veiculo.update({ where: { id }, data: payload })
+      await prisma.veiculo.update({ where: { id }, data: paraGravar })
     } else {
       await prisma.veiculo.create({ data: payload })
     }

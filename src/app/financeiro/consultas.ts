@@ -38,20 +38,45 @@ const INCLUDE_TITULO = {
   veiculo: { select: { apelido: true } },
 } as const
 
+/** Quantos títulos a tela carrega de uma vez. */
+export const LIMITE_TELA = 300
+
+/**
+ * Títulos de uma ponta, com o total real do filtro.
+ *
+ * O total vem de um `aggregate` sobre o filtro inteiro, e não da soma das
+ * linhas trazidas: a lista é cortada no limite, o total não. Somar só o que
+ * coube na tela fazia o rodapé discordar do painel assim que passasse de 300
+ * títulos em aberto — e a discordância seria silenciosa, que é o pior jeito de
+ * errar dinheiro.
+ */
 export async function listarTitulos(
   tipo: 'RECEITA' | 'DESPESA',
-  opcoes: { apenasAbertos?: boolean } = {},
+  opcoes: { apenasAbertos?: boolean; limite?: number } = {},
 ) {
-  return prisma.lancamento.findMany({
-    where: {
-      tipo,
-      status: opcoes.apenasAbertos ? EM_ABERTO : { not: 'CANCELADO' },
-    },
-    include: INCLUDE_TITULO,
-    // Títulos sem vencimento (esperando o gatilho AO_RECEBER) vão para o fim.
-    orderBy: [{ dataVencimento: { sort: 'asc', nulls: 'last' } }, { criadoEm: 'asc' }],
-    take: 300,
-  })
+  const where = {
+    tipo,
+    status: opcoes.apenasAbertos ? EM_ABERTO : { not: 'CANCELADO' as const },
+  }
+  const limite = opcoes.limite ?? LIMITE_TELA
+
+  const [titulos, totais] = await Promise.all([
+    prisma.lancamento.findMany({
+      where,
+      include: INCLUDE_TITULO,
+      // Títulos sem vencimento (esperando o gatilho AO_RECEBER) vão para o fim.
+      orderBy: [{ dataVencimento: { sort: 'asc', nulls: 'last' } }, { criadoEm: 'asc' }],
+      take: limite,
+    }),
+    prisma.lancamento.aggregate({ _sum: { valor: true, valorPago: true }, _count: true, where }),
+  ])
+
+  return {
+    titulos,
+    quantidade: totais._count,
+    total: Number(totais._sum.valor ?? 0) - Number(totais._sum.valorPago ?? 0),
+    naoExibidos: Math.max(0, totais._count - titulos.length),
+  }
 }
 
 /** Nome da outra ponta do título — quem paga ou quem recebe. */
@@ -81,17 +106,17 @@ export async function resumoFinanceiro() {
         where: { tipo: 'DESPESA', status: EM_ABERTO },
       }),
       prisma.lancamento.aggregate({
-        _sum: { valor: true },
+        _sum: { valor: true, valorPago: true },
         _count: true,
         where: { tipo: 'RECEITA', status: EM_ABERTO, dataVencimento: { lt: hoje } },
       }),
       prisma.lancamento.aggregate({
-        _sum: { valor: true },
+        _sum: { valor: true, valorPago: true },
         _count: true,
         where: { tipo: 'DESPESA', status: EM_ABERTO, dataVencimento: { lt: hoje } },
       }),
       prisma.lancamento.aggregate({
-        _sum: { valor: true },
+        _sum: { valor: true, valorPago: true },
         _count: true,
         where: {
           status: EM_ABERTO,
@@ -114,6 +139,11 @@ export async function resumoFinanceiro() {
       }),
     ])
 
+  /*
+    Sempre o saldo, nunca o valor de face. Um título PARCIAL de R$ 10.000 com
+    R$ 6.000 já pagos deve R$ 4.000 — mostrar os R$ 10.000 no "vencido" faz o
+    painel cobrar dinheiro que já entrou.
+  */
   const saldoAberto = (a: { _sum: { valor: unknown; valorPago: unknown } }) =>
     Number(a._sum.valor ?? 0) - Number(a._sum.valorPago ?? 0)
 
@@ -122,11 +152,11 @@ export async function resumoFinanceiro() {
     aReceberQtd: aReceber._count,
     aPagar: saldoAberto(aPagar),
     aPagarQtd: aPagar._count,
-    vencidosReceber: Number(vencidosReceber._sum.valor ?? 0),
+    vencidosReceber: saldoAberto(vencidosReceber),
     vencidosReceberQtd: vencidosReceber._count,
-    vencidosPagar: Number(vencidosPagar._sum.valor ?? 0),
+    vencidosPagar: saldoAberto(vencidosPagar),
     vencidosPagarQtd: vencidosPagar._count,
-    venceEm7: Number(venceEm7._sum.valor ?? 0),
+    venceEm7: saldoAberto(venceEm7),
     venceEm7Qtd: venceEm7._count,
     recebidoMes: Number(recebidoMes._sum.valor ?? 0),
     pagoMes: Number(pagoMes._sum.valor ?? 0),

@@ -210,6 +210,12 @@ export const viagemSchema = z.object({
 export const fecharViagemSchema = z
   .object({
     dataChegada: dataObrigatoria,
+    /*
+      A saída também se corrige aqui. Viagem importada de MDF-e nasce com o km
+      do cadastro do caminhão, que é um palpite — e o único momento em que
+      alguém tem o painel à vista é o fechamento.
+    */
+    kmInicial: numeroOpcional,
     kmFinal: numeroObrigatorio('a quilometragem de chegada'),
     kmCarregado: numeroOpcional,
     kmImprodutivo: numeroOpcional,

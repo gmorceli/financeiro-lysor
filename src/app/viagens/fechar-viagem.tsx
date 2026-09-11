@@ -23,13 +23,16 @@ export function FecharViagem({
   viagemId: string
   kmInicial: number
 }) {
+  const [kmSaida, setKmSaida] = useState(String(kmInicial))
   const [kmFinal, setKmFinal] = useState('')
   const [kmCarregado, setKmCarregado] = useState('')
 
+  const saida = Number(kmSaida)
+  const temSaida = kmSaida !== '' && Number.isFinite(saida)
   const final = Number(kmFinal)
-  const temFinal = kmFinal !== '' && Number.isFinite(final) && final >= kmInicial
+  const temFinal = kmFinal !== '' && Number.isFinite(final) && temSaida && final >= saida
   const km = temFinal
-    ? calcularKm(kmInicial, final, kmCarregado === '' ? undefined : Number(kmCarregado))
+    ? calcularKm(saida, final, kmCarregado === '' ? undefined : Number(kmCarregado))
     : null
 
   return (
@@ -46,10 +49,30 @@ export function FecharViagem({
             <Input name="dataChegada" type="date" defaultValue={hoje()} required />
           </Campo>
 
+          {/*
+            A saída é editável porque nem sempre é verdade: viagem importada de
+            MDF-e nasce com o km do cadastro do caminhão, e ninguém confere isso
+            na importação. Aqui a pessoa está com o painel na frente.
+          */}
+          <Campo
+            label="Km de saída"
+            obrigatorio
+            dica={`Estava ${formatarNumero(kmInicial)} km no cadastro. Corrija se o painel diz outra coisa.`}
+            erro={erros.kmInicial}
+          >
+            <Input
+              name="kmInicial"
+              type="number"
+              inputMode="numeric"
+              value={kmSaida}
+              onChange={(e) => setKmSaida(e.target.value)}
+              required
+            />
+          </Campo>
+
           <Campo
             label="Km de chegada"
             obrigatorio
-            dica={`Saiu com ${formatarNumero(kmInicial)} km.`}
             erro={erros.kmFinal}
           >
             <Input

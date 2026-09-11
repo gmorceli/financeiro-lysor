@@ -10,10 +10,15 @@ import { contraparte, type TituloListado } from './consultas'
 
 export function TabelaTitulos({
   titulos,
+  total,
+  naoExibidos = 0,
   tipo,
   vazio,
 }: {
   titulos: TituloListado[]
+  /** Total do filtro inteiro, não só das linhas exibidas. */
+  total: number
+  naoExibidos?: number
   tipo: 'RECEITA' | 'DESPESA'
   vazio: { titulo: string; descricao: string }
 }) {
@@ -24,11 +29,6 @@ export function TabelaTitulos({
       </Card>
     )
   }
-
-  const total = titulos.reduce(
-    (soma, t) => soma + (Number(t.valor) - Number(t.valorPago)),
-    0,
-  )
 
   return (
     <Card>
@@ -93,6 +93,13 @@ export function TabelaTitulos({
           </tr>
         </tfoot>
       </Tabela>
+      {naoExibidos > 0 && (
+        <p className="border-t border-borda px-4 py-3 text-xs text-texto-suave">
+          A tela mostra os {titulos.length} títulos mais antigos. Outros {naoExibidos} não
+          couberam aqui, mas <strong className="font-medium text-texto">estão no total
+          acima</strong> e na planilha do botão Excel.
+        </p>
+      )}
     </Card>
   )
 }

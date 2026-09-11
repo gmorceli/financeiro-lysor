@@ -81,18 +81,22 @@ export async function fecharViagem(
   const { kmFinal, kmCarregado, dataChegada, kmImprodutivo, motivoKmImprodutivo } =
     validado.dados
 
-  if (kmFinal < viagem.kmInicial) {
+  // Quem fecha a viagem está com o painel à vista: é a hora de corrigir também
+  // a saída, que numa viagem importada de MDF-e veio do cadastro do caminhão.
+  const kmSaida = validado.dados.kmInicial ?? viagem.kmInicial
+
+  if (kmFinal < kmSaida) {
     return {
       erroGeral: 'Confira os campos destacados.',
       errosPorCampo: {
         kmFinal: [
-          `A chegada não pode ser menor que a saída (${viagem.kmInicial.toLocaleString('pt-BR')} km).`,
+          `A chegada não pode ser menor que a saída (${kmSaida.toLocaleString('pt-BR')} km).`,
         ],
       },
     }
   }
 
-  const km = calcularKm(viagem.kmInicial, kmFinal, kmCarregado)
+  const km = calcularKm(kmSaida, kmFinal, kmCarregado)
 
   try {
     await prisma.$transaction([
@@ -100,6 +104,7 @@ export async function fecharViagem(
         where: { id },
         data: {
           dataChegada,
+          kmInicial: kmSaida,
           kmFinal,
           kmCarregado: km.carregado ?? null,
           kmVazio: km.vazio ?? null,

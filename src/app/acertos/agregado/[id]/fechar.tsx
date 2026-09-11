@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import { AvisoErro, Button, Campo, Checkbox, Input } from '@/components/ui'
 import { ESTADO_INICIAL } from '@/lib/acoes'
+import { arredondar } from '@/lib/calculos'
 import { formatarData, formatarMoeda } from '@/lib/utils'
 import { fecharAcertoDoAgregado } from '../../actions'
 
@@ -30,7 +31,7 @@ function BotaoFechar({ quantos, total }: { quantos: number; total: number }) {
         ? 'Fechando…'
         : quantos === 0
           ? 'Escolha ao menos um CT-e'
-          : `Fechar ${quantos} CT-e — ${formatarMoeda(total)}`}
+          : `Fechar ${quantos} CT-e — ${formatarMoeda(Math.abs(total))}`}
     </Button>
   )
 }
@@ -73,12 +74,24 @@ export function FecharAcertoAgregado({
   }
 
   const escolhidas = linhas.filter((l) => marcados.has(l.lancamentoId))
-  const total = escolhidas.reduce((s, l) => s + l.valor, 0)
+  /*
+    Os dois fluxos aparecem na mesma lista e têm sinais opostos: no
+    INTERMEDIADO a Lysor recebeu do cliente e repassa (DESPESA); no DIRETO o
+    agregado recebeu e deve a comissão (RECEITA). Somar os dois como se fossem
+    a mesma coisa inflava o valor do acerto — e o número do botão é justamente
+    o que a pessoa confere antes de clicar.
+  */
+  const aPagar = escolhidas
+    .filter((l) => l.tipo === 'DESPESA')
+    .reduce((s, l) => s + l.valor, 0)
+  const aReceber = escolhidas
+    .filter((l) => l.tipo === 'RECEITA')
+    .reduce((s, l) => s + l.valor, 0)
+  const total = arredondar(aPagar - aReceber)
   const comissao = escolhidas.reduce((s, l) => s + l.comissao, 0)
   const seguro = escolhidas.reduce((s, l) => s + l.seguro, 0)
   const cte = escolhidas.reduce((s, l) => s + l.valorCte, 0)
   const adiantados = escolhidas.filter((l) => !l.clientePagou).length
-  const paga = escolhidas.some((l) => l.tipo === 'DESPESA')
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -152,9 +165,19 @@ export function FecharAcertoAgregado({
             <dt className="text-texto-suave">Seguro sobre a carga</dt>
             <dd className="tabular-nums text-primaria">− {formatarMoeda(seguro)}</dd>
           </div>
+          {aPagar > 0 && aReceber > 0 && (
+            <div className="flex justify-between gap-3 text-xs text-texto-suave">
+              <dt>
+                {formatarMoeda(aPagar)} a repassar menos {formatarMoeda(aReceber)} a
+                receber — há CT-e dos dois fluxos neste acerto
+              </dt>
+            </div>
+          )}
           <div className="flex justify-between gap-3 border-t border-borda pt-2 text-base font-medium">
-            <dt className="text-texto">{paga ? 'A repassar ao agregado' : 'A receber do agregado'}</dt>
-            <dd className="tabular-nums text-texto">{formatarMoeda(total)}</dd>
+            <dt className="text-texto">
+              {total >= 0 ? 'A repassar ao agregado' : 'A receber do agregado'}
+            </dt>
+            <dd className="tabular-nums text-texto">{formatarMoeda(Math.abs(total))}</dd>
           </div>
         </dl>
       </div>

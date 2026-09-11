@@ -120,6 +120,13 @@ export function Cascata({ resultado }: { resultado: ResultadoPeriodo }) {
           />
           <Linha rotulo="Lucro operacional" valor={lucroOperacional} total />
         </div>
+        {resultado.custoDiretoSemViagem > 0 && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-alerta">
+            {formatarMoeda(resultado.custoDiretoSemViagem)} em custos diretos lançados
+            sem viagem e sem caminhão que rodasse no período — entram no resultado, mas
+            ninguém sabe de qual frete são. Lance diesel e pedágio pela tela da viagem.
+          </p>
+        )}
         {resultado.custoVeiculoSemViagem > 0 && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-alerta">
             {formatarMoeda(resultado.custoVeiculoSemViagem)} em custos de veículo sem

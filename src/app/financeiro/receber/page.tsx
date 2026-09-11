@@ -5,7 +5,7 @@ import { TabelaTitulos } from '../tabela-titulos'
 export const dynamic = 'force-dynamic'
 
 export default async function ContasAReceber() {
-  const titulos = await listarTitulos('RECEITA', { apenasAbertos: true })
+  const lista = await listarTitulos('RECEITA', { apenasAbertos: true })
 
   return (
     <>
@@ -14,7 +14,9 @@ export default async function ContasAReceber() {
         descricao="Gerado automaticamente a cada frete lançado."
       />
       <TabelaTitulos
-        titulos={titulos}
+        titulos={lista.titulos}
+        total={lista.total}
+        naoExibidos={lista.naoExibidos}
         tipo="RECEITA"
         vazio={{
           titulo: 'Nada a receber',

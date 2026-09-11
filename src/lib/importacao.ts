@@ -209,21 +209,43 @@ export async function importarLinha(
     return { criado: true as const, freteId: frete.id, viagemId: null }
   }
 
-  const veiculo = await tx.veiculo.findUniqueOrThrow({
-    where: { id: linha.veiculoId! },
-    select: { odometroAtual: true },
-  })
+  /*
+    A importação não sabe o odômetro: o MDF-e não traz km. O melhor palpite é o
+    último km conhecido do caminhão — e "último" precisa considerar as viagens
+    já registradas, senão importar cinco manifestos do mesmo caminhão de uma vez
+    dava a todos o mesmo km de saída e a última viagem fechava com cinco mil km
+    de uma só. Continua sendo palpite: por isso a tela de fechamento deixa
+    corrigir a saída, e a observação abaixo diz de onde o número veio.
+  */
+  const [veiculo, ultima] = await Promise.all([
+    tx.veiculo.findUniqueOrThrow({
+      where: { id: linha.veiculoId! },
+      select: { odometroAtual: true },
+    }),
+    tx.viagem.findFirst({
+      where: { veiculoId: linha.veiculoId! },
+      orderBy: { dataSaida: 'desc' },
+      select: { kmInicial: true, kmFinal: true },
+    }),
+  ])
+  const kmSaida = Math.max(
+    veiculo.odometroAtual ?? 0,
+    ultima?.kmFinal ?? 0,
+    ultima?.kmInicial ?? 0,
+  )
 
   const viagem = await tx.viagem.create({
     data: {
       veiculoId: linha.veiculoId!,
       motoristaId: linha.motoristaId!,
       dataSaida: m.dataViagem,
-      kmInicial: veiculo.odometroAtual ?? 0,
+      kmInicial: kmSaida,
       origem: m.origem,
       destino: m.destino,
       status: 'EM_ANDAMENTO',
-      observacoes: `Importada do MDF-e ${m.numero}`,
+      observacoes:
+        `Importada do MDF-e ${m.numero}. Km de saída (${kmSaida.toLocaleString('pt-BR')}) ` +
+        'veio do último registro do caminhão — confira no fechamento.',
     },
     select: { id: true },
   })

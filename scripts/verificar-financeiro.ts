@@ -9,6 +9,7 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { gerarTitulosDoFrete, baixarTitulo } from '../src/lib/titulos'
 import { arredondar, calcularCobrancaAgregado } from '../src/lib/calculos'
+import { listarTitulos, resumoFinanceiro } from '../src/app/financeiro/consultas'
 
 const prisma = new PrismaClient()
 let falhas = 0
@@ -180,6 +181,64 @@ async function main() {
     Number(doDireto[0]?.valor) === 390,
     `R$ ${Number(doDireto[0]?.valor)} (o CT-e é 3.000)`,
   )
+
+
+  // --- Vencido é saldo, não valor de face ----------------------------------
+  // Um título PARCIAL em atraso deve o que falta. O painel somava o valor
+  // cheio, então R$ 6.000 já pagos continuavam aparecendo como dívida vencida.
+  const antesDoVencido = await resumoFinanceiro()
+  const categoriaAvulsa = await prisma.categoria.findFirstOrThrow({
+    where: { nivelCusto: 'OVERHEAD' },
+    select: { id: true },
+  })
+  const vencido = await prisma.lancamento.create({
+    data: {
+      tipo: 'DESPESA',
+      categoriaId: categoriaAvulsa.id,
+      descricao: `Vencido parcial ${MARCA}`,
+      valor: new Prisma.Decimal(10000),
+      dataCompetencia: new Date('2020-01-10'),
+      dataVencimento: new Date('2020-01-20'),
+    },
+    select: { id: true },
+  })
+  await baixarTitulo(prisma, vencido.id, { data: new Date('2020-02-01'), valor: 6000 })
+
+  const comVencido = await resumoFinanceiro()
+  checar(
+    'título vencido pela metade entra no painel só pelo saldo',
+    arredondar(comVencido.vencidosPagar - antesDoVencido.vencidosPagar) === 4000,
+    `subiu R$ ${arredondar(comVencido.vencidosPagar - antesDoVencido.vencidosPagar)}, o título é de R$ 10.000 com R$ 6.000 pagos`,
+  )
+
+  // --- Total da tela não pode depender do corte da lista -------------------
+  const listaInteira = await listarTitulos('DESPESA', { apenasAbertos: true })
+  const listaCortada = await listarTitulos('DESPESA', { apenasAbertos: true, limite: 1 })
+  checar(
+    'o corte da lista não mexe no total em aberto',
+    arredondar(listaCortada.total) === arredondar(listaInteira.total),
+    `cortada R$ ${arredondar(listaCortada.total)} / inteira R$ ${arredondar(listaInteira.total)}`,
+  )
+  checar(
+    'e a tela sabe quantos títulos ficaram de fora',
+    listaCortada.titulos.length === 1 &&
+      listaCortada.naoExibidos === listaCortada.quantidade - 1,
+    `${listaCortada.naoExibidos} fora de ${listaCortada.quantidade}`,
+  )
+  checar(
+    'o total bate com a soma dos saldos de todos os títulos',
+    arredondar(listaInteira.total) ===
+      arredondar(
+        listaInteira.titulos.reduce(
+          (s, t) => s + (Number(t.valor) - Number(t.valorPago)),
+          0,
+        ),
+      ),
+    `R$ ${arredondar(listaInteira.total)}`,
+  )
+
+  await prisma.baixa.deleteMany({ where: { lancamentoId: vencido.id } })
+  await prisma.lancamento.delete({ where: { id: vencido.id } })
 
   console.log(falhas === 0 ? '\nFinanceiro verificado.' : `\n${falhas} falha(s).`)
   await prisma.$disconnect()
