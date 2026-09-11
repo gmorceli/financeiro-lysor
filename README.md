@@ -99,7 +99,7 @@ senha, essa porta fecha para sempre e trocar e-mail passa a ser pela tela.
 Variáveis necessárias: `DATABASE_URL` e `DIRECT_URL`. Depois do primeiro acesso,
 remova `ADMIN_SENHA` do painel: ela não serve mais para nada.
 
-Verificações — **185 asserções contra um Postgres de verdade**:
+Verificações — **233 asserções contra um Postgres de verdade**:
 
 ```bash
 npm run typecheck         # tipos
@@ -109,6 +109,7 @@ npm run verificar:custos  # custos, títulos e margem contra o banco
 npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
 npm run verificar:resultado   # cascata do DRE e rateio por frete
 npm run verificar:acertos     # acerto de motorista e de agregado
+npm run verificar:importacao  # leitura do MDF-e e importação de frete
 npm run verificar:auth    # senha, sessão, bloqueio, permissão e guarda das actions
 npm run build             # build de produção
 ```
@@ -121,7 +122,7 @@ E mais duas verificações que exigem o servidor no ar e o Chromium instalado
 npm i -D playwright && npx playwright install chromium
 npm run build && npm start
 npm run verificar:navegador   # 29 asserções no formulário de verdade
-npm run verificar:mobile      # as 30 telas medidas em 375px
+npm run verificar:mobile      # as 31 telas medidas em 375px
 ```
 
 `verificar:mobile` é o que impede a promessa fácil de "é responsivo". Ele mede,
@@ -225,6 +226,31 @@ o rateio não perde nem inventa dinheiro.
   conferir o percentual e o seguro na hora de cadastrar.
 - **Nada é apagado**: veículo sai de operação mudando de status, porque carrega
   histórico de viagem e de custo.
+
+### Importação de MDF-e
+
+O manifesto que a transportadora já emite traz, num arquivo só, o que hoje se
+digita: a chave do CT-e, o valor do frete, **o valor da carga** — base do seguro
+de 0,06% do agregado —, a placa, o motorista com CPF, a origem e o destino. Nos
+28 manifestos de setembro, cada um trouxe exatamente um CT-e, o que faz dele um
+registro por frete.
+
+O campo que decide tudo é `veicTracao/prop`: quando existe, o caminhão é de
+terceiro e o frete é de agregado; quando não existe, é da frota. É a mesma
+escolha que o operador faz na tela, declarada na nota fiscal.
+
+**A importação não cria cadastro.** Ela cria viagem, frete e título, e só.
+Criar cliente com prazo de pagamento zero faria o caixa projetar dinheiro à
+vista; criar motorista com comissão zero faria o acerto pagar a menos. O arquivo
+fiscal tem o nome e o documento, mas não tem a regra de negócio — e é a regra que
+faz o número certo. Quando falta cadastro, a linha não entra e a tela diz o quê.
+
+Duas armadilhas de leitura, ambas verificadas: a chave do CT-e tem 44 dígitos e
+vira `5.12e+43` se o parser converter número sozinho, e CPF com zero à esquerda
+perde o zero. Por isso o XML é lido inteiramente como texto, e os valores viram
+número um a um.
+
+A chave do CT-e é única no banco: reimportar a mesma pasta não duplica nada.
 
 ### Acerto de motorista e de agregado
 

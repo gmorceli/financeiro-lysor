@@ -68,7 +68,7 @@ async function main() {
 
   const ROTAS = [
     '/', '/viagens', '/viagens/nova', `/viagens/${viagem.id}`,
-    '/fretes', `/viagens/${viagem.id}/fretes/novo`, '/fretes/agregado/novo',
+    '/fretes', `/viagens/${viagem.id}/fretes/novo`, '/fretes/agregado/novo', '/fretes/importar',
     '/custos', '/custos/abastecimentos/novo', '/custos/manutencoes/novo',
     `/viagens/${viagem.id}/despesas/novo`,
     '/financeiro', '/financeiro/pagar', '/financeiro/receber',

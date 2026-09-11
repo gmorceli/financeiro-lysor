@@ -51,9 +51,14 @@ export default async function ListaFretes({
         titulo="Fretes"
         descricao="Frete de caminhão próprio entra pela viagem. Frete de agregado entra direto aqui."
         acao={
-          <Link href="/fretes/agregado/novo">
-            <Button>Frete de agregado</Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/fretes/importar">
+              <Button variante="secundario">Importar MDF-e</Button>
+            </Link>
+            <Link href="/fretes/agregado/novo">
+              <Button>Frete de agregado</Button>
+            </Link>
+          </div>
         }
       />
 
