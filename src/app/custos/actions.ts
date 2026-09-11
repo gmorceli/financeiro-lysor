@@ -9,6 +9,7 @@ import { arredondar } from '@/lib/calculos'
 import { CATEGORIA, idDaCategoria } from '@/lib/categorias'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 /**
  * Todo custo lançado vira um título financeiro na mesma transação.
@@ -22,6 +23,7 @@ export async function salvarAbastecimento(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const validado = validarFormulario(abastecimentoSchema, formData)
   if (!validado.sucesso) return validado.estado
 
@@ -99,6 +101,7 @@ export async function salvarManutencao(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const validado = validarFormulario(manutencaoSchema, formData)
   if (!validado.sucesso) return validado.estado
 

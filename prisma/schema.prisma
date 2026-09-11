@@ -173,19 +173,55 @@ model Empresa {
 }
 
 model Usuario {
-  id           String        @id @default(cuid())
-  nome         String
-  email        String        @unique
-  senhaHash    String
-  perfil       PerfilUsuario
-  motoristaId  String?       @unique
-  ativo        Boolean       @default(true)
-  criadoEm     DateTime      @default(now())
-  atualizadoEm DateTime      @updatedAt
+  id          String        @id @default(cuid())
+  nome        String
+  email       String        @unique
+  senhaHash   String
+  perfil      PerfilUsuario
+  motoristaId String?       @unique
+  ativo       Boolean       @default(true)
+
+  /// Senha criada por um administrador só serve para o primeiro login: enquanto
+  /// esta flag estiver de pé, toda navegação cai na tela de troca de senha.
+  trocarSenha     Boolean   @default(true)
+  senhaDefinidaEm DateTime  @default(now())
+  ultimoAcessoEm  DateTime?
+
+  /// Freio de tentativa em massa. Contador zera no acerto; ao estourar o limite
+  /// a conta fica presa até `bloqueadoAte`.
+  tentativasFalhas Int       @default(0)
+  bloqueadoAte     DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
   motorista Motorista? @relation(fields: [motoristaId], references: [id])
+  sessoes   Sessao[]
 
   @@map("usuario")
+}
+
+/// Sessão de login. O cookie do navegador carrega o token em claro; aqui fica
+/// só o SHA-256 dele. Vazamento do banco não vira sessão ativa — é a mesma
+/// razão pela qual senha não se guarda legível.
+///
+/// Sessão no banco em vez de JWT porque a revogação tem que ser imediata: ao
+/// trocar a senha ou desativar o usuário, as sessões dele somem no mesmo
+/// instante. Com token assinado auto-contido, só o vencimento derruba.
+model Sessao {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  usuarioId String
+  expiraEm  DateTime
+  criadoEm  DateTime @default(now())
+  ip        String?
+  navegador String?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEm])
+  @@map("sessao")
 }
 
 model Cliente {

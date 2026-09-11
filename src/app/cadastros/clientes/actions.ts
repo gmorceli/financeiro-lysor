@@ -4,11 +4,13 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { clienteSchema } from '@/lib/validacao'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 export async function salvarCliente(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('cadastros')
   const id = formData.get('id')?.toString() || undefined
   const validado = validarFormulario(clienteSchema, formData)
   if (!validado.sucesso) return validado.estado

@@ -42,20 +42,28 @@ receita e é a maior mudança do planejamento — ver
 
 ## Estado do código
 
-**MVP completo.** Schema com 21 tabelas, migration aplicada, e as cinco fatias
-da aplicação: cadastros, operação (viagem e frete), custos, financeiro (contas
-a pagar e receber, baixa, fluxo de caixa, tela da manhã) e o relatório de
-resultado por caminhão e por frete.
+**MVP completo, com autenticação.** Schema com 22 tabelas, migration aplicada,
+e as seis fatias da aplicação: cadastros, operação (viagem e frete), custos,
+financeiro (contas a pagar e receber, baixa, fluxo de caixa, tela da manhã),
+o relatório de resultado por caminhão e por frete, e o acesso — login, perfis,
+sessão e cadastro de usuários.
 
 ```bash
 npm install
 cp .env.example .env      # preencher DATABASE_URL
 npm run db:migrate        # cria as tabelas
 npm run db:seed           # categorias + frota + motoristas
+npm run usuario -- --nome "Ana Paula" --email ana@lysor.com.br --perfil ADMIN
 npm run dev               # http://localhost:3000
 ```
 
-Verificações:
+O `npm run usuario` existe para o primeiro acesso e só para ele: a tela de
+usuários exige estar logado como administrador, e no banco novo não há ninguém
+— alguém tem que quebrar esse ovo de fora. A senha é pedida no prompt, sem eco,
+e nasce provisória: o sistema obriga a trocar no primeiro login. Daí em diante
+o caminho é a tela.
+
+Verificações — **158 asserções contra um Postgres de verdade**:
 
 ```bash
 npm run typecheck         # tipos
@@ -64,7 +72,18 @@ npm run verificar:fluxo   # fluxo operacional contra o banco
 npm run verificar:custos  # custos, títulos e margem contra o banco
 npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
 npm run verificar:resultado   # cascata do DRE e rateio por frete
+npm run verificar:auth    # senha, sessão, bloqueio, permissão e guarda das actions
 npm run build             # build de produção
+```
+
+E mais 29 asserções no navegador, que exigem o servidor no ar e o Chromium
+instalado (por isso o Playwright não está em `package.json` — ele baixaria um
+navegador de ~150 MB em toda instalação, inclusive na do deploy):
+
+```bash
+npm i -D playwright && npx playwright install chromium
+npm run build && npm start
+npm run verificar:navegador
 ```
 
 ### O fluxo de operação
@@ -163,20 +182,54 @@ o rateio não perde nem inventa dinheiro.
 - **Nada é apagado**: veículo sai de operação mudando de status, porque carrega
   histórico de viagem e de custo.
 
+### Acesso
+
+Quatro perfis, e a permissão é por **área**, não por tela — tela muda toda
+semana, área é a divisão real do trabalho:
+
+| Perfil | Alcança |
+|---|---|
+| Administrador | tudo, mais o cadastro de usuários |
+| Financeiro | operação, cadastros, financeiro e resultado |
+| Operação | viagem, frete, custo e cadastros — não vê dinheiro |
+| Motorista | nada: reservado ao aplicativo do motorista, que não existe ainda |
+
+A tabela em `src/lib/permissoes.ts` é a única fonte: o menu, os layouts e as
+actions leem dela, então não existe o caso de a tela esconder um botão que a
+action ainda aceita. Quem é de Operação não vê as abas de Financeiro e
+Resultado, a tela da manhã nem consulta valores a receber, e a URL digitada na
+mão cai numa tela que diz o que faltou.
+
+Três decisões que valem registro:
+
+1. **Sessão no banco, não JWT.** Revogação tem que ser imediata: trocar a senha
+   ou desativar alguém derruba as sessões no mesmo instante. Com token assinado
+   auto-contido, só o vencimento derruba. O cookie carrega um token aleatório;
+   o banco guarda só o SHA-256 dele.
+2. **O middleware não valida nada.** Ele roda na borda, onde o Prisma não roda,
+   então só pergunta se existe cookie — cookie forjado passa por ele e morre no
+   layout da área. A checagem de verdade está em `exigirUsuario` e
+   `exigirAcesso`, e toda Server Action chama uma das duas: action é endpoint
+   HTTP público, não basta esconder o botão.
+3. **scrypt do `node:crypto`**, N=2^16, com os parâmetros dentro do próprio
+   hash. Sem dependência nativa para compilar no deploy, e quando o custo subir
+   as senhas antigas continuam conferindo com os números com que foram criadas.
+
+`npm run verificar:auth` varre `src/app` e falha se alguma action ficou sem
+guarda ou se alguma área ficou sem layout protegido — é o que impede o buraco
+que não aparece em lugar nenhum da interface.
+
 ## Stack
 
-Next.js (App Router) + TypeScript · PostgreSQL + Prisma · shadcn/ui + Tailwind ·
-Auth.js · storage S3-compatível · deploy Vercel com Postgres em Railway/Supabase.
+Next.js (App Router) + TypeScript · PostgreSQL + Prisma · Tailwind · sessão
+própria em tabela · storage S3-compatível · deploy Vercel com Postgres em
+Railway/Supabase.
 
 ## Próximo passo
 
-**Autenticação**, antes de qualquer deploy — combinado para depois dos
-primeiros testes da cliente.
-
-Depois: acerto de motorista e agregado (que transforma a comissão calculada em
-título a pagar), exportação para Excel dos relatórios, e a importação de XML de
+**Acerto de motorista e agregado** — transforma a comissão calculada em título
+a pagar. Depois, exportação para Excel dos relatórios e a importação de XML de
 CT-e e do extrato de pedágio, que corta boa parte da digitação.
 
-Faltando: **autenticação** (antes de qualquer deploy) e os **XMLs de CT-e** da
-cliente, para validar se `infCarga/vCarga` traz o valor da nota — o que
-eliminaria a digitação manual no acerto do agregado.
+Faltando da cliente: os **XMLs de CT-e**, para validar se `infCarga/vCarga` traz
+o valor da nota — o que eliminaria a digitação manual no acerto do agregado.

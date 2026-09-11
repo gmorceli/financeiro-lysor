@@ -204,7 +204,7 @@ Uma recomendação, defendida:
 | Banco | **PostgreSQL** | Transacional, `numeric` decente, views materializadas para os relatórios pesados |
 | ORM | **Prisma** | Migrations versionadas e schema legível — importa porque o modelo vai mudar |
 | UI | **shadcn/ui + Tailwind** | Tabelas e formulários prontos, visual sério sem designer |
-| Auth | **Auth.js** com e-mail/senha + perfis | Suficiente; SSO não faz sentido aqui |
+| Auth | **Sessão própria** em tabela, e-mail/senha + perfis por área | Revisto na implementação: ver nota abaixo. SSO não faz sentido aqui |
 | Arquivos | **S3-compatível** (Supabase Storage / R2) | Anexos desde o dia 1 |
 | Deploy | **Vercel** (app) + **Railway/Supabase** (Postgres) | Infra que a BDN já opera, custo baixo, backup gerenciado |
 | Relatórios | SQL + views materializadas, export XLSX/PDF | O cliente **vai** querer no Excel. Aceite isso e entregue bem feito. |
@@ -318,3 +318,29 @@ ser levantado na virada:
 **Recomendação: tratar isso como uma tela de "abertura" no sistema**, guiada,
 não como planilha de importação. É a primeira coisa que o cliente vai usar — e a
 primeira impressão dele sobre a facilidade do sistema.
+
+---
+
+## Nota de implementação — autenticação (11/09/2026)
+
+A tabela acima previa Auth.js. A implementação não usou, e vale dizer por quê,
+porque a decisão contraria o caminho mais batido.
+
+O que este sistema precisa de autenticação é pouco e específico: e-mail e senha,
+quatro perfis, revogação imediata. Não há login social, não há SSO, não há
+múltiplos provedores — os três problemas que o Auth.js resolve bem. O que
+sobraria do Auth.js aqui seria o *Credentials provider*, que por decisão do
+próprio projeto **obriga sessão por JWT**, e JWT é justamente o que não serve:
+token assinado auto-contido não se revoga, só vence. "Desativei a Ana agora" tem
+que valer agora, não no fim da validade do token.
+
+Sessão em tabela custa duas coisas — uma consulta por navegação, já deduplicada
+por requisição com o `cache` do React, e o middleware não poder validar nada,
+porque roda na borda onde o Prisma não roda. A segunda é a que exige atenção: o
+middleware só pergunta se existe cookie, e a checagem real acontece no layout de
+cada área e em toda action. Cookie forjado passa pelo middleware de propósito, e
+morre uma camada adiante.
+
+Em troca: nenhuma dependência nova, nenhum segredo em variável de ambiente,
+revogação imediata na troca de senha e na desativação, e o `verificar:auth`
+exercitando bloqueio, expiração e permissão contra o Postgres de verdade.

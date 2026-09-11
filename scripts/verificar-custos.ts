@@ -17,12 +17,56 @@ function checar(nome: string, ok: boolean, detalhe = '') {
 const MARCA = 'teste-custos'
 
 async function main() {
-  await prisma.abastecimento.deleteMany({ where: { lancamento: { observacoes: MARCA } } })
+  await prisma.abastecimento.deleteMany({ where: { OR: [{ lancamento: { observacoes: MARCA } }, { viagem: { observacoes: MARCA } }] } })
   await prisma.lancamento.deleteMany({ where: { observacoes: MARCA } })
   await prisma.lancamento.deleteMany({ where: { descricao: { contains: MARCA } } })
+  await prisma.lancamento.deleteMany({ where: { viagem: { observacoes: MARCA } } })
   await prisma.manutencao.deleteMany({ where: { descricao: { contains: MARCA } } })
+  await prisma.frete.deleteMany({ where: { viagem: { observacoes: MARCA } } })
+  await prisma.viagem.deleteMany({ where: { observacoes: MARCA } })
 
-  const viagem = await prisma.viagem.findFirstOrThrow({
+  /**
+   * Viagem própria deste script, em vez da primeira que aparecer no banco.
+   *
+   * Com `findFirstOrThrow` a margem era calculada sobre o que outro script
+   * tivesse deixado na mesma viagem — rodar a suíte inteira em sequência fazia
+   * duas asserções falharem, e rodar só este arquivo fazia passar. Teste que
+   * depende da ordem de execução não vale como teste.
+   */
+  const veiculo = await prisma.veiculo.findFirstOrThrow({ where: { tipo: { not: 'CARRETA' } } })
+  const motorista = await prisma.motorista.findFirstOrThrow({
+    where: { modeloRemuneracao: 'COMISSAO' },
+  })
+  const clienteDoTeste = await prisma.cliente.upsert({
+    where: { cnpj: '11222333000199' },
+    update: {},
+    create: { razaoSocial: `Frigorífico ${MARCA}`, cnpj: '11222333000199' },
+  })
+
+  const viagem = await prisma.viagem.create({
+    data: {
+      veiculoId: veiculo.id,
+      motoristaId: motorista.id,
+      dataSaida: new Date('2026-09-02'),
+      dataChegada: new Date('2026-09-03'),
+      kmInicial: 100_000,
+      kmFinal: 100_796,
+      origem: 'Nova Mutum',
+      destino: 'Várzea Grande',
+      status: 'FECHADA',
+      observacoes: MARCA,
+      fretes: {
+        create: {
+          clienteId: clienteDoTeste.id,
+          modalidade: 'FROTA_PROPRIA',
+          origem: 'Nova Mutum',
+          destino: 'Várzea Grande',
+          valorCte: 5970,
+          valorFreteReal: 9564,
+          dataEmissao: new Date('2026-09-02'),
+        },
+      },
+    },
     include: { veiculo: true, motorista: true, fretes: true },
   })
   const combustivel = await prisma.categoria.findUniqueOrThrow({ where: { nome: 'Combustível' } })

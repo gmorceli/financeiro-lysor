@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { baixarTitulo, gerarTitulosDoFrete } from '@/lib/titulos'
 import { traduzirErroPrisma, type EstadoFormulario } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 /**
  * Registra o pagamento ou o recebimento de um título.
@@ -16,6 +17,7 @@ export async function registrarBaixa(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('financeiro')
   const id = formData.get('lancamentoId')?.toString()
   const dataTexto = formData.get('data')?.toString()
   const valorTexto = formData.get('valor')?.toString()
@@ -82,6 +84,7 @@ export async function registrarBaixa(
  * Idempotente por frete: quem já tem título é ignorado.
  */
 export async function gerarTitulosPendentes(): Promise<EstadoFormulario> {
+  await exigirAcesso('financeiro')
   try {
     const semTitulo = await prisma.frete.findMany({
       where: { status: { not: 'CANCELADO' }, lancamentos: { none: {} } },

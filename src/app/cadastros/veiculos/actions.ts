@@ -8,6 +8,7 @@ import {
   validarFormulario,
   type EstadoFormulario,
 } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 const ROTULOS = { apelido: 'esse apelido', placa: 'essa placa' }
 
@@ -15,6 +16,7 @@ export async function salvarVeiculo(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('cadastros')
   const id = formData.get('id')?.toString() || undefined
   const validado = validarFormulario(veiculoSchema, formData)
   if (!validado.sucesso) return validado.estado
@@ -46,6 +48,7 @@ export async function salvarVeiculo(
  * operação é mudança de status.
  */
 export async function inativarVeiculo(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('cadastros')
   try {
     await prisma.veiculo.update({ where: { id }, data: { status: 'INATIVO' } })
   } catch (erro) {
@@ -56,6 +59,7 @@ export async function inativarVeiculo(id: string): Promise<EstadoFormulario> {
 }
 
 export async function reativarVeiculo(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('cadastros')
   try {
     await prisma.veiculo.update({ where: { id }, data: { status: 'ATIVO' } })
   } catch (erro) {

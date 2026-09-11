@@ -2,7 +2,7 @@
   "name": "financeiro-lysor",
   "version": "0.1.0",
   "private": true,
-  "description": "Sistema de gestão financeira e operacional da Lysor Transportes",
+  "description": "Sistema de gest\u00e3o financeira e operacional da Lysor Transportes",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -15,11 +15,14 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:validate": "prisma validate && prisma format --check",
+    "usuario": "tsx scripts/criar-usuario.ts",
     "verificar": "tsx scripts/verificar-regras.ts",
     "verificar:fluxo": "tsx scripts/verificar-fluxo.ts",
     "verificar:custos": "tsx scripts/verificar-custos.ts",
     "verificar:financeiro": "tsx scripts/verificar-financeiro.ts",
-    "verificar:resultado": "tsx scripts/verificar-resultado.ts"
+    "verificar:resultado": "tsx scripts/verificar-resultado.ts",
+    "verificar:auth": "tsx scripts/verificar-auth.ts",
+    "verificar:navegador": "tsx scripts/verificar-navegador.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -8,6 +8,7 @@ import { calcularCobrancaAgregado, type RegraCobrancaAgregado } from '@/lib/calc
 import { gerarTitulosDoFrete } from '@/lib/titulos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 const ROTULOS = { chaveCte: 'essa chave de CT-e' }
 
@@ -16,6 +17,7 @@ export async function salvarFreteProprio(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const id = formData.get('id')?.toString() || undefined
   const validado = validarFormulario(freteProprioSchema, formData)
   if (!validado.sucesso) return validado.estado
@@ -58,6 +60,7 @@ export async function salvarFreteAgregado(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const id = formData.get('id')?.toString() || undefined
   const validado = validarFormulario(freteAgregadoSchema, formData)
   if (!validado.sucesso) return validado.estado
@@ -114,6 +117,7 @@ export async function salvarFreteAgregado(
 }
 
 export async function excluirFrete(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   try {
     const frete = await prisma.frete.findUnique({
       where: { id },

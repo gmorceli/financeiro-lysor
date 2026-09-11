@@ -7,11 +7,13 @@ import { fecharViagemSchema, viagemSchema } from '@/lib/validacao'
 import { calcularKm } from '@/lib/calculos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 export async function criarViagem(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const validado = validarFormulario(viagemSchema, formData)
   if (!validado.sucesso) return validado.estado
 
@@ -35,6 +37,7 @@ export async function atualizarViagem(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const id = formData.get('id')?.toString()
   if (!id) return { erroGeral: 'Viagem não identificada.' }
 
@@ -62,6 +65,7 @@ export async function fecharViagem(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const id = formData.get('id')?.toString()
   if (!id) return { erroGeral: 'Viagem não identificada.' }
 
@@ -124,6 +128,7 @@ export async function fecharViagem(
 }
 
 export async function reabrirViagem(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   try {
     await prisma.viagem.update({ where: { id }, data: { status: 'EM_ANDAMENTO' } })
   } catch (erro) {

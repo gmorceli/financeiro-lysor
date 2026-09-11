@@ -8,6 +8,7 @@ import { despesaViagemSchema } from '@/lib/validacao'
 import { arredondar } from '@/lib/calculos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
+import { exigirAcesso } from '@/lib/sessao'
 
 /**
  * Despesa avulsa de viagem: pedágio, chapa, lavagem, alimentação.
@@ -19,6 +20,7 @@ export async function salvarDespesaViagem(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   const validado = validarFormulario(despesaViagemSchema, formData)
   if (!validado.sucesso) return validado.estado
 
@@ -53,6 +55,7 @@ export async function salvarDespesaViagem(
 }
 
 export async function excluirLancamento(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
   try {
     const lancamento = await prisma.lancamento.findUnique({
       where: { id },

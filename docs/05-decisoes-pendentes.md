@@ -56,7 +56,7 @@ sistemas — e evita a discussão contábil que trava a entrega.
 
 ### ✅ D2. Stack — **fechada**
 **Decidido:** Next.js (App Router) + TypeScript · PostgreSQL + Prisma ·
-shadcn/ui + Tailwind · Auth.js · storage S3-compatível para anexos ·
+shadcn/ui + Tailwind · sessão própria em tabela · storage S3-compatível para anexos ·
 deploy Vercel (app) + Railway/Supabase (Postgres).
 
 Detalhes e justificativa em `01-avaliacao-e-arquitetura.md` §7. O schema pode

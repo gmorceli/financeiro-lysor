@@ -362,3 +362,47 @@ export const despesaViagemSchema = z.object({
 export type AbastecimentoInput = z.infer<typeof abastecimentoSchema>
 export type ManutencaoInput = z.infer<typeof manutencaoSchema>
 export type DespesaViagemInput = z.infer<typeof despesaViagemSchema>
+
+// ---------------------------------------------------------------- Acesso
+
+/**
+ * Senha não passa por trim nem por normalização de caixa: espaço no começo é
+ * parte da senha que a pessoa escolheu. O e-mail passa pelos dois, porque
+ * ninguém digita o próprio e-mail com maiúscula de propósito.
+ */
+export const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email('E-mail inválido'),
+  senha: z.string().min(1, 'Informe a senha'),
+  destino: textoOpcional,
+})
+
+export const trocaDeSenhaSchema = z
+  .object({
+    senhaAtual: z.string().min(1, 'Informe a senha atual'),
+    senhaNova: z.string().min(1, 'Informe a senha nova'),
+    confirmacao: z.string().min(1, 'Repita a senha nova'),
+  })
+  .refine((v) => v.senhaNova === v.confirmacao, {
+    message: 'As duas não são iguais',
+    path: ['confirmacao'],
+  })
+  .refine((v) => v.senhaNova !== v.senhaAtual, {
+    message: 'A senha nova tem que ser diferente da atual',
+    path: ['senhaNova'],
+  })
+
+export const usuarioSchema = z.object({
+  nome: z.string().trim().min(3, 'Nome muito curto'),
+  email: z.string().trim().toLowerCase().email('E-mail inválido'),
+  perfil: z.enum(['ADMIN', 'FINANCEIRO', 'OPERACAO', 'MOTORISTA']),
+  motoristaId: textoOpcional,
+  ativo: booleanoFormulario,
+})
+
+export const redefinirSenhaSchema = z.object({
+  usuarioId: z.string().trim().min(1),
+  senhaNova: z.string().min(1, 'Informe a senha provisória'),
+})
+
+export type LoginInput = z.infer<typeof loginSchema>
+export type UsuarioInput = z.infer<typeof usuarioSchema>

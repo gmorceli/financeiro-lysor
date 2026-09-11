@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { prisma } from '@/lib/prisma'
+import { exigirUsuario } from '@/lib/sessao'
+import { podeAcessar } from '@/lib/permissoes'
 import { formatarMoeda, rota } from '@/lib/utils'
 import { Badge, Button, CabecalhoPagina, Card, Tabela, Td, Th } from '@/components/ui'
 import { EM_ABERTO, emDias, hojeUtc, resumoFinanceiro } from './financeiro/consultas'
@@ -15,20 +17,30 @@ export const dynamic = 'force-dynamic'
  * relatório de fechamento; isto aqui é o que ela abre às cinco da manhã.
  */
 export default async function Inicio() {
+  const usuario = await exigirUsuario()
   const hoje = hojeUtc()
 
+  /**
+   * Quem é só Operação não vê dinheiro nesta tela. Não basta esconder os
+   * cartões: as consultas nem rodam, porque valor a receber não deve nem sair
+   * do banco para uma renderização que não tem direito a ele.
+   */
+  const veFinanceiro = podeAcessar(usuario.perfil, 'financeiro')
+
   const [resumo, vencendo, viagensAbertas, incompletas] = await Promise.all([
-    resumoFinanceiro(),
-    prisma.lancamento.findMany({
-      where: { status: EM_ABERTO, dataVencimento: { lte: emDias(7) } },
-      include: {
-        cliente: { select: { razaoSocial: true, nomeFantasia: true } },
-        fornecedor: { select: { nome: true } },
-        proprietario: { select: { nome: true } },
-      },
-      orderBy: { dataVencimento: 'asc' },
-      take: 12,
-    }),
+    veFinanceiro ? resumoFinanceiro() : null,
+    veFinanceiro
+      ? prisma.lancamento.findMany({
+          where: { status: EM_ABERTO, dataVencimento: { lte: emDias(7) } },
+          include: {
+            cliente: { select: { razaoSocial: true, nomeFantasia: true } },
+            fornecedor: { select: { nome: true } },
+            proprietario: { select: { nome: true } },
+          },
+          orderBy: { dataVencimento: 'asc' },
+          take: 12,
+        })
+      : [],
     prisma.viagem.findMany({
       where: { status: { in: ['PLANEJADA', 'EM_ANDAMENTO'] } },
       include: {
@@ -45,18 +57,23 @@ export default async function Inicio() {
     }),
   ])
 
-  const saldo = resumo.aReceber - resumo.aPagar
-
   const indicadores: Array<{
     rotulo: string
     valor: number
     href: Route
     destaque?: boolean
-  }> = [
-    { rotulo: 'A receber', valor: resumo.aReceber, href: '/financeiro/receber' },
-    { rotulo: 'A pagar', valor: resumo.aPagar, href: '/financeiro/pagar' },
-    { rotulo: 'Saldo projetado', valor: saldo, href: '/financeiro', destaque: true },
-  ]
+  }> = resumo
+    ? [
+        { rotulo: 'A receber', valor: resumo.aReceber, href: '/financeiro/receber' },
+        { rotulo: 'A pagar', valor: resumo.aPagar, href: '/financeiro/pagar' },
+        {
+          rotulo: 'Saldo projetado',
+          valor: resumo.aReceber - resumo.aPagar,
+          href: '/financeiro',
+          destaque: true,
+        },
+      ]
+    : []
 
   return (
     <>
@@ -70,6 +87,7 @@ export default async function Inicio() {
         }
       />
 
+      {indicadores.length > 0 && (
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         {indicadores.map((indicador) => (
           <Link key={indicador.rotulo} href={indicador.href} className="group">
@@ -90,12 +108,15 @@ export default async function Inicio() {
           </Link>
         ))}
       </div>
+      )}
 
-      {(resumo.vencidosPagarQtd > 0 || resumo.vencidosReceberQtd > 0 || incompletas > 0) && (
+      {((resumo?.vencidosPagarQtd ?? 0) > 0 ||
+        (resumo?.vencidosReceberQtd ?? 0) > 0 ||
+        incompletas > 0) && (
         <Card className="mb-4 border-amber-200 bg-amber-50 p-4">
           <h2 className="text-sm font-semibold text-alerta">Precisa de atenção</h2>
           <ul className="mt-2 space-y-1 text-sm text-texto">
-            {resumo.vencidosPagarQtd > 0 && (
+            {resumo && resumo.vencidosPagarQtd > 0 && (
               <li>
                 <Link href="/financeiro/pagar" className="text-primaria hover:underline">
                   {resumo.vencidosPagarQtd} conta{resumo.vencidosPagarQtd === 1 ? '' : 's'} a
@@ -104,7 +125,7 @@ export default async function Inicio() {
                 — {formatarMoeda(resumo.vencidosPagar)}
               </li>
             )}
-            {resumo.vencidosReceberQtd > 0 && (
+            {resumo && resumo.vencidosReceberQtd > 0 && (
               <li>
                 <Link href="/financeiro/receber" className="text-primaria hover:underline">
                   {resumo.vencidosReceberQtd} recebimento
@@ -125,7 +146,8 @@ export default async function Inicio() {
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className={veFinanceiro ? 'grid gap-4 lg:grid-cols-2' : 'grid gap-4'}>
+        {veFinanceiro && (
         <Card>
           <div className="border-b border-borda px-4 py-3">
             <h2 className="text-sm font-semibold text-texto">Vence nos próximos 7 dias</h2>
@@ -179,6 +201,7 @@ export default async function Inicio() {
             </Tabela>
           )}
         </Card>
+        )}
 
         <Card>
           <div className="border-b border-borda px-4 py-3">
