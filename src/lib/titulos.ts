@@ -193,3 +193,39 @@ export async function baixarTitulo(
 
   return { liquidado, dependentesLiberados: 0 }
 }
+
+/**
+ * Refaz os títulos de um frete corrigido.
+ *
+ * `gerarTitulosDoFrete` é idempotente de propósito: chamado duas vezes, não
+ * duplica. O efeito colateral é que corrigir o valor de um frete não mexia no
+ * recebível — o CT-e passava a valer R$ 9.564 na tela e continuava sendo
+ * cobrado R$ 10.000 do cliente, sem nenhum aviso.
+ *
+ * Só refaz o que ninguém tocou. Título com baixa registrada ou preso a um
+ * acerto representa dinheiro que já andou: apagá-lo para regravar sumiria com
+ * um pagamento real do histórico. Nesse caso a correção é estorno, e a função
+ * diz isso em vez de fazer.
+ */
+export async function regerarTitulosDoFrete(tx: Tx, freteId: string): Promise<number> {
+  const existentes = await tx.lancamento.findMany({
+    where: { freteId, status: { not: 'CANCELADO' } },
+    select: { id: true, valorPago: true, acertoId: true, lancamentoOrigemId: true },
+  })
+  if (existentes.length === 0) return gerarTitulosDoFrete(tx, freteId)
+
+  const intocado = existentes.every((l) => Number(l.valorPago) === 0 && !l.acertoId)
+  if (!intocado) {
+    throw new Error(
+      'Os títulos deste frete já têm baixa ou acerto lançado. Estorne antes de corrigir o valor.',
+    )
+  }
+
+  // Dependentes primeiro: o repasse ao agregado aponta para o recebível do
+  // cliente, e apagar o pai antes do filho viola a referência.
+  const dependentes = existentes.filter((l) => l.lancamentoOrigemId)
+  await tx.lancamento.deleteMany({ where: { id: { in: dependentes.map((l) => l.id) } } })
+  await tx.lancamento.deleteMany({ where: { id: { in: existentes.map((l) => l.id) } } })
+
+  return gerarTitulosDoFrete(tx, freteId)
+}

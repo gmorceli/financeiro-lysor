@@ -55,28 +55,13 @@ export async function salvarVeiculo(
   return { ok: true }
 }
 
-/**
- * Veículo nunca é apagado: ele carrega histórico de viagem e de custo. Sair de
- * operação é mudança de status.
- */
-export async function inativarVeiculo(id: string): Promise<EstadoFormulario> {
-  await exigirAcesso('cadastros')
-  try {
-    await prisma.veiculo.update({ where: { id }, data: { status: 'INATIVO' } })
-  } catch (erro) {
-    return traduzirErroPrisma(erro)
-  }
-  revalidatePath('/cadastros/veiculos')
-  return { ok: true }
-}
+/*
+  Veículo nunca é apagado: ele carrega histórico de viagem e de custo. Sair de
+  operação é mudança de status, e o status é um campo do próprio formulário, com
+  quatro estados — ativo, em manutenção, inativo e vendido.
 
-export async function reativarVeiculo(id: string): Promise<EstadoFormulario> {
-  await exigirAcesso('cadastros')
-  try {
-    await prisma.veiculo.update({ where: { id }, data: { status: 'ATIVO' } })
-  } catch (erro) {
-    return traduzirErroPrisma(erro)
-  }
-  revalidatePath('/cadastros/veiculos')
-  return { ok: true }
-}
+  Existiam aqui um `inativarVeiculo` e um `reativarVeiculo` que nenhuma tela
+  chamava. Foram removidos: dois atalhos que só conheciam dois dos quatro
+  estados eram uma segunda fonte da mesma verdade, esperando divergir da
+  primeira.
+*/

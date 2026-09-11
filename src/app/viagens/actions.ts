@@ -132,9 +132,28 @@ export async function fecharViagem(
   return { ok: true }
 }
 
+/**
+ * Reabre uma viagem fechada.
+ *
+ * É o caminho de volta para o custo que chegou depois: nota do borracheiro na
+ * semana seguinte, pedágio que veio na fatura do mês. Sem isso o custo ia parar
+ * no menu Custos sem viagem, e a margem daquela viagem ficava alta para sempre.
+ *
+ * Viagem cujo frete já entrou num acerto de motorista não reabre: mexer nos
+ * valores depois do acerto fechado deixaria um pagamento sem lastro.
+ */
 export async function reabrirViagem(id: string): Promise<EstadoFormulario> {
   await exigirAcesso('operacao')
   try {
+    const acertados = await prisma.frete.count({
+      where: { viagemId: id, acertoMotoristaId: { not: null } },
+    })
+    if (acertados > 0) {
+      return {
+        erroGeral:
+          'Os fretes desta viagem já entraram num acerto de motorista. Refaça o acerto antes de reabrir.',
+      }
+    }
     await prisma.viagem.update({ where: { id }, data: { status: 'EM_ANDAMENTO' } })
   } catch (erro) {
     return traduzirErroPrisma(erro)

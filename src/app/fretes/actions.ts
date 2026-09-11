@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { freteAgregadoSchema, freteProprioSchema } from '@/lib/validacao'
 import { calcularCobrancaAgregado, type RegraCobrancaAgregado } from '@/lib/calculos'
-import { gerarTitulosDoFrete } from '@/lib/titulos'
+import { gerarTitulosDoFrete, regerarTitulosDoFrete } from '@/lib/titulos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
 import { exigirAcesso } from '@/lib/sessao'
@@ -34,6 +34,8 @@ export async function salvarFreteProprio(
     await prisma.$transaction(async (tx) => {
       if (id) {
         await tx.frete.update({ where: { id }, data: payload })
+        // Corrigir o valor do frete tem que corrigir o que se cobra do cliente.
+        await regerarTitulosDoFrete(tx, id)
       } else {
         const frete = await tx.frete.create({ data: payload, select: { id: true } })
         // O recebível do cliente nasce junto com o frete.
@@ -41,6 +43,7 @@ export async function salvarFreteProprio(
       }
     })
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro, ROTULOS)
   }
 
@@ -102,12 +105,14 @@ export async function salvarFreteAgregado(
     await prisma.$transaction(async (tx) => {
       if (id) {
         await tx.frete.update({ where: { id }, data: payload })
+        await regerarTitulosDoFrete(tx, id)
       } else {
         const frete = await tx.frete.create({ data: payload, select: { id: true } })
         await gerarTitulosDoFrete(tx, frete.id)
       }
     })
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro, ROTULOS)
   }
 

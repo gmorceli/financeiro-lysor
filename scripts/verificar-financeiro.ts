@@ -7,7 +7,7 @@
  * projetar uma saída sem lastro.
  */
 import { PrismaClient, Prisma } from '@prisma/client'
-import { gerarTitulosDoFrete, baixarTitulo } from '../src/lib/titulos'
+import { gerarTitulosDoFrete, baixarTitulo, regerarTitulosDoFrete } from '../src/lib/titulos'
 import { arredondar, calcularCobrancaAgregado } from '../src/lib/calculos'
 import { listarTitulos, resumoFinanceiro } from '../src/app/financeiro/consultas'
 
@@ -182,6 +182,58 @@ async function main() {
     `R$ ${Number(doDireto[0]?.valor)} (o CT-e é 3.000)`,
   )
 
+
+  // --- Corrigir o frete corrige o que se cobra -----------------------------
+  // `gerarTitulosDoFrete` é idempotente: chamado de novo, não faz nada. O
+  // efeito colateral era que corrigir o valor do frete não mexia no recebível —
+  // o CT-e passava a valer R$ 9.564 na tela e continuava sendo cobrado
+  // R$ 10.000 do cliente, sem aviso nenhum.
+  const paraCorrigir = await prisma.frete.create({
+    data: {
+      clienteId: cliente.id,
+      modalidade: 'FROTA_PROPRIA',
+      origem: 'Nova Mutum',
+      destino: 'Cuiabá',
+      numeroCte: '8801',
+      valorCte: new Prisma.Decimal(10000),
+      valorFreteReal: new Prisma.Decimal(10000),
+      dataEmissao: new Date('2026-09-10'),
+      observacoes: MARCA,
+    },
+    select: { id: true },
+  })
+  await prisma.$transaction((tx) => gerarTitulosDoFrete(tx, paraCorrigir.id))
+
+  await prisma.frete.update({
+    where: { id: paraCorrigir.id },
+    data: { valorFreteReal: new Prisma.Decimal(9564) },
+  })
+  await prisma.$transaction((tx) => regerarTitulosDoFrete(tx, paraCorrigir.id))
+
+  const corrigidos = await prisma.lancamento.findMany({
+    where: { freteId: paraCorrigir.id, status: { not: 'CANCELADO' } },
+    select: { id: true, valor: true },
+  })
+  checar(
+    'corrigir o valor do frete refaz o recebível pelo valor novo',
+    corrigidos.length === 1 && Number(corrigidos[0]?.valor) === 9564,
+    `${corrigidos.length} título(s) de R$ ${Number(corrigidos[0]?.valor)}`,
+  )
+
+  // Com dinheiro já recebido a correção para: apagar o título para regravar
+  // sumiria com uma baixa real do histórico.
+  await baixarTitulo(prisma, corrigidos[0]!.id, { data: new Date('2026-09-15'), valor: 1000 })
+  let recusou = false
+  try {
+    await prisma.$transaction((tx) => regerarTitulosDoFrete(tx, paraCorrigir.id))
+  } catch (erro) {
+    recusou = erro instanceof Error && erro.message.includes('Estorne')
+  }
+  checar('e recusa refazer título que já tem baixa', recusou)
+  checar(
+    'o título com baixa continua lá, intacto',
+    (await prisma.lancamento.count({ where: { freteId: paraCorrigir.id } })) === 1,
+  )
 
   // --- Vencido é saldo, não valor de face ----------------------------------
   // Um título PARCIAL em atraso deve o que falta. O painel somava o valor
