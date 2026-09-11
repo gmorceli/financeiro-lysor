@@ -17,5 +17,6 @@
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "//": "Os dois verificadores de navegador importam o Playwright, que de propósito NÃO é dependência do projeto: ele baixaria um navegador de ~150 MB em toda instalação, inclusive na do deploy. Sem o pacote instalado, o type-check do build não acha os tipos e o build quebra — foi o que aconteceu. Ficam de fora da checagem; quem os roda instala o Playwright antes, como o README manda.",
+  "exclude": ["node_modules", "scripts/verificar-navegador.ts", "scripts/verificar-mobile.ts"]
 }

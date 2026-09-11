@@ -151,7 +151,7 @@ async function main() {
     fontePequena: string[]
   }
 
-  const medir = (p: import('playwright').Page): Promise<Medida> =>
+  const medir = (p: { evaluate: (e: string) => Promise<unknown> }): Promise<Medida> =>
     p.evaluate(MEDIR) as Promise<Medida>
 
   function relatar(rota: string, status: number | undefined, d: Medida) {
