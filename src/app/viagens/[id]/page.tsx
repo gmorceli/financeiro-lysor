@@ -9,11 +9,13 @@ import {
   CabecalhoPagina,
   Card,
   EstadoVazio,
+  LINK_TABELA,
   Tabela,
   Td,
   Th,
 } from '@/components/ui'
 import { FecharViagem } from '../fechar-viagem'
+import { ExcluirCusto, ReabrirViagem } from './acoes'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,7 +53,7 @@ export default async function DetalheViagem({
         orderBy: { dataEmissao: 'asc' },
       },
       lancamentos: {
-        where: { tipo: 'DESPESA' },
+        where: { tipo: 'DESPESA', status: { not: 'CANCELADO' } },
         include: { categoria: { select: { nome: true } } },
         orderBy: { dataCompetencia: 'asc' },
       },
@@ -61,9 +63,11 @@ export default async function DetalheViagem({
 
   if (!viagem) notFound()
 
-  const receita = viagem.fretes.reduce((soma, f) => soma + Number(f.valorFreteReal), 0)
-  const receitaCte = viagem.fretes.reduce((soma, f) => soma + Number(f.valorCte), 0)
-  const comissao = viagem.fretes.reduce(
+  // CT-e cancelado não é receita nem base de comissão — a mesma regra do DRE.
+  const valendo = viagem.fretes.filter((f) => f.status !== 'CANCELADO')
+  const receita = valendo.reduce((soma, f) => soma + Number(f.valorFreteReal), 0)
+  const receitaCte = valendo.reduce((soma, f) => soma + Number(f.valorCte), 0)
+  const comissao = valendo.reduce(
     (soma, f) =>
       soma +
       calcularComissaoMotorista(
@@ -168,15 +172,23 @@ export default async function DetalheViagem({
                 <Th>Rota</Th>
                 <Th className="text-right">Valor do CT-e</Th>
                 <Th className="text-right">Valor real</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
               {viagem.fretes.map((frete) => {
                 const divergente = Number(frete.valorFreteReal) !== Number(frete.valorCte)
+                const cancelado = frete.status === 'CANCELADO'
                 return (
-                  <tr key={frete.id} className="hover:bg-fundo">
+                  <tr
+                    key={frete.id}
+                    className={cancelado ? 'opacity-50 hover:bg-fundo' : 'hover:bg-fundo'}
+                  >
                     <Td className="tabular-nums text-texto-suave">
                       {frete.numeroCte ?? '—'}
+                      {cancelado && (
+                        <span className="ml-2 text-xs font-medium text-erro">cancelado</span>
+                      )}
                     </Td>
                     <Td className="text-texto">
                       {frete.cliente.nomeFantasia || frete.cliente.razaoSocial}
@@ -189,11 +201,16 @@ export default async function DetalheViagem({
                     </Td>
                     <Td className="text-right tabular-nums font-medium text-texto">
                       {formatarMoeda(frete.valorFreteReal)}
-                      {divergente && (
+                      {divergente && !cancelado && (
                         <span className="ml-1 text-xs font-normal text-alerta">
                           ≠ CT-e
                         </span>
                       )}
+                    </Td>
+                    <Td className="text-right">
+                      <Link href={rota(`/fretes/${frete.id}`)} className={LINK_TABELA}>
+                        {cancelado ? 'Ver' : 'Corrigir'}
+                      </Link>
                     </Td>
                   </tr>
                 )
@@ -249,6 +266,7 @@ export default async function DetalheViagem({
                 <Th>Tipo</Th>
                 <Th>Descrição</Th>
                 <Th className="text-right">Valor</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
@@ -261,6 +279,19 @@ export default async function DetalheViagem({
                   <Td className="text-texto">{lancamento.descricao}</Td>
                   <Td className="text-right tabular-nums font-medium text-texto">
                     {formatarMoeda(lancamento.valor)}
+                  </Td>
+                  {/*
+                    Lançar R$ 3.000 onde era R$ 300 é o erro mais fácil de
+                    cometer aqui. Sem este botão, o jeito de corrigir era abrir
+                    o banco.
+                  */}
+                  <Td className="text-right">
+                    {Number(lancamento.valorPago) === 0 && (
+                      <ExcluirCusto
+                        lancamentoId={lancamento.id}
+                        descricao={lancamento.descricao}
+                      />
+                    )}
                   </Td>
                 </tr>
               ))}
@@ -311,9 +342,19 @@ export default async function DetalheViagem({
           <FecharViagem viagemId={viagem.id} kmInicial={viagem.kmInicial} />
         </Card>
       ) : (
-        <Link href="/viagens">
-          <Button variante="secundario">Voltar para viagens</Button>
-        </Link>
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold text-texto">Chegou custo depois?</h2>
+          <p className="mt-1 text-sm text-texto-suave">
+            Viagem fechada não aceita lançamento. Reabrir devolve os botões de
+            abastecimento e despesa, e depois é só fechar de novo com o mesmo km.
+          </p>
+          <ReabrirViagem viagemId={viagem.id} numero={viagem.numero} />
+          <div className="mt-4 border-t border-borda pt-4">
+            <Link href="/viagens">
+              <Button variante="secundario">Voltar para viagens</Button>
+            </Link>
+          </div>
+        </Card>
       )}
     </>
   )

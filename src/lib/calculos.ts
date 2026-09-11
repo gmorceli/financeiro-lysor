@@ -66,3 +66,33 @@ export function calcularConsumo(
   if (litros <= 0 || odometroAtual <= odometroAnterior) return null
   return arredondar((odometroAtual - odometroAnterior) / litros)
 }
+
+/**
+ * Soma meses a uma data mantendo o dia dentro do mês de destino.
+ *
+ * `setMonth` do JavaScript transborda: 31 de janeiro mais um mês vira 3 de
+ * março, e um parcelamento de manutenção feito no fim do mês saía com uma
+ * parcela na data errada e a seguinte de volta no lugar certo. Aqui o dia é
+ * grampeado no último do mês de destino — 31/01 vira 28/02, que é o que
+ * qualquer boleto faz.
+ *
+ * Tudo em UTC, porque as colunas de data do banco são `date` e o servidor não
+ * necessariamente roda no fuso de Mato Grosso.
+ */
+export function somarMeses(data: Date, meses: number): Date {
+  const ano = data.getUTCFullYear()
+  const mes = data.getUTCMonth()
+  const dia = data.getUTCDate()
+  const ultimoDoDestino = new Date(Date.UTC(ano, mes + meses + 1, 0)).getUTCDate()
+  return new Date(
+    Date.UTC(
+      ano,
+      mes + meses,
+      Math.min(dia, ultimoDoDestino),
+      data.getUTCHours(),
+      data.getUTCMinutes(),
+      data.getUTCSeconds(),
+      data.getUTCMilliseconds(),
+    ),
+  )
+}

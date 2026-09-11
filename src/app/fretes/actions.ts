@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { freteAgregadoSchema, freteProprioSchema } from '@/lib/validacao'
 import { calcularCobrancaAgregado, type RegraCobrancaAgregado } from '@/lib/calculos'
-import { gerarTitulosDoFrete } from '@/lib/titulos'
+import { gerarTitulosDoFrete, regerarTitulosDoFrete } from '@/lib/titulos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
 import { exigirAcesso } from '@/lib/sessao'
@@ -34,6 +34,8 @@ export async function salvarFreteProprio(
     await prisma.$transaction(async (tx) => {
       if (id) {
         await tx.frete.update({ where: { id }, data: payload })
+        // Corrigir o valor do frete tem que corrigir o que se cobra do cliente.
+        await regerarTitulosDoFrete(tx, id)
       } else {
         const frete = await tx.frete.create({ data: payload, select: { id: true } })
         // O recebível do cliente nasce junto com o frete.
@@ -41,6 +43,7 @@ export async function salvarFreteProprio(
       }
     })
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro, ROTULOS)
   }
 
@@ -102,12 +105,14 @@ export async function salvarFreteAgregado(
     await prisma.$transaction(async (tx) => {
       if (id) {
         await tx.frete.update({ where: { id }, data: payload })
+        await regerarTitulosDoFrete(tx, id)
       } else {
         const frete = await tx.frete.create({ data: payload, select: { id: true } })
         await gerarTitulosDoFrete(tx, frete.id)
       }
     })
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro, ROTULOS)
   }
 
@@ -121,13 +126,42 @@ export async function excluirFrete(id: string): Promise<EstadoFormulario> {
   try {
     const frete = await prisma.frete.findUnique({
       where: { id },
-      select: { viagemId: true, _count: { select: { lancamentos: true } } },
+      select: {
+        viagemId: true,
+        acertoMotoristaId: true,
+        lancamentos: { select: { id: true, valorPago: true } },
+      },
     })
     if (!frete) return { erroGeral: 'Frete não encontrado.' }
 
-    // Frete que já gerou título financeiro não se apaga: cancela.
-    if (frete._count.lancamentos > 0) {
-      await prisma.frete.update({ where: { id }, data: { status: 'CANCELADO' } })
+    if (frete.acertoMotoristaId) {
+      return {
+        erroGeral:
+          'Este frete já entrou num acerto de motorista. Cancelar aqui deixaria o acerto pago sem lastro — refaça o acerto primeiro.',
+      }
+    }
+
+    // Título com dinheiro recebido ou pago não se cancela por aqui: sumiria do
+    // painel um valor que passou pela conta de verdade.
+    const comMovimento = frete.lancamentos.filter((l) => Number(l.valorPago) > 0)
+    if (comMovimento.length > 0) {
+      return {
+        erroGeral:
+          'Já existe pagamento registrado nos títulos deste frete. Estorne a baixa antes de cancelar.',
+      }
+    }
+
+    // Frete que já gerou título financeiro não se apaga: cancela. E cancelar o
+    // frete sem cancelar o título deixava a cobrança viva no contas a receber —
+    // um CT-e cancelado continuava sendo cobrado do cliente.
+    if (frete.lancamentos.length > 0) {
+      await prisma.$transaction([
+        prisma.frete.update({ where: { id }, data: { status: 'CANCELADO' } }),
+        prisma.lancamento.updateMany({
+          where: { freteId: id, status: { not: 'LIQUIDADO' } },
+          data: { status: 'CANCELADO' },
+        }),
+      ])
     } else {
       await prisma.frete.delete({ where: { id } })
     }

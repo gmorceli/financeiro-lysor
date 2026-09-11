@@ -162,7 +162,7 @@ async function main() {
     listarTitulos('DESPESA', { apenasAbertos: true }),
     listarTitulos('RECEITA', { apenasAbertos: true }),
   ])
-  const livroFin = await reabrir(montarPlanilhaFinanceiro(aPagar, aReceber))
+  const livroFin = await reabrir(montarPlanilhaFinanceiro(aPagar.titulos, aReceber.titulos))
   checar(
     'a planilha do financeiro tem as duas abas',
     livroFin.worksheets.map((a) => a.name).join(', ') === 'A pagar, A receber',
@@ -184,7 +184,7 @@ async function main() {
 
   // Título de repasse a agregado nasce sem vencimento: a planilha não pode
   // inventar data, e a situação precisa dizer por quê.
-  const semVencimento = aPagar.filter((t) => t.dataVencimento === null)
+  const semVencimento = aPagar.titulos.filter((t) => t.dataVencimento === null)
   if (semVencimento.length > 0) {
     const pagar = livroFin.getWorksheet('A pagar')!
     let conferido = false

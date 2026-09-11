@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { abastecimentoSchema, manutencaoSchema } from '@/lib/validacao'
-import { arredondar } from '@/lib/calculos'
+import { arredondar, somarMeses } from '@/lib/calculos'
 import { CATEGORIA, idDaCategoria } from '@/lib/categorias'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
@@ -142,8 +142,7 @@ export async function salvarManutencao(
       const residuo = arredondar(total - valorParcela * parcelas)
 
       for (let i = 0; i < parcelas; i++) {
-        const vencimento = new Date(primeiroVencimento)
-        vencimento.setMonth(vencimento.getMonth() + i)
+        const vencimento = somarMeses(primeiroVencimento, i)
         const ehUltima = i === parcelas - 1
 
         const lancamento = await tx.lancamento.create({

@@ -7,6 +7,7 @@ import {
   CabecalhoPagina,
   Card,
   EstadoVazio,
+  LINK_TABELA,
   Tabela,
   Td,
   Th,
@@ -102,6 +103,7 @@ export default async function ListaFretes({
                 <Th>Quem rodou</Th>
                 <Th className="text-right">Valor do CT-e</Th>
                 <Th className="text-right">Receita da Lysor</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
@@ -111,13 +113,20 @@ export default async function ListaFretes({
                   ? Number(frete.valorComissaoAgregado ?? 0) +
                     Number(frete.valorSeguroAgregado ?? 0)
                   : Number(frete.valorFreteReal)
+                const cancelado = frete.status === 'CANCELADO'
                 return (
-                  <tr key={frete.id} className="hover:bg-fundo">
+                  <tr
+                    key={frete.id}
+                    className={cancelado ? 'opacity-50 hover:bg-fundo' : 'hover:bg-fundo'}
+                  >
                     <Td className="tabular-nums text-texto-suave">
                       {formatarData(frete.dataEmissao)}
                     </Td>
                     <Td className="tabular-nums text-texto-suave">
                       {frete.numeroCte ?? '—'}
+                      {cancelado && (
+                        <span className="ml-2 text-xs font-medium text-erro">cancelado</span>
+                      )}
                     </Td>
                     <Td className="text-texto">
                       {frete.cliente.nomeFantasia || frete.cliente.razaoSocial}
@@ -148,7 +157,17 @@ export default async function ListaFretes({
                       {formatarMoeda(frete.valorCte)}
                     </Td>
                     <Td className="text-right tabular-nums font-medium text-texto">
-                      {formatarMoeda(receita)}
+                      {cancelado ? '—' : formatarMoeda(receita)}
+                    </Td>
+                    {/*
+                      Sem esta coluna não havia nenhum caminho de volta: um
+                      valor digitado errado ia para o resultado, para a comissão
+                      e para a cobrança do cliente, e ficava lá.
+                    */}
+                    <Td className="text-right">
+                      <Link href={rota(`/fretes/${frete.id}`)} className={LINK_TABELA}>
+                        {cancelado ? 'Ver' : 'Corrigir'}
+                      </Link>
                     </Td>
                   </tr>
                 )

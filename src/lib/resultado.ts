@@ -82,6 +82,8 @@ export type ResultadoPeriodo = {
   porVeiculo: LinhaVeiculo[]
   /** Custos de veículo que não puderam ser ligados a nenhuma viagem do período. */
   custoVeiculoSemViagem: number
+  /** Custos diretos lançados sem viagem e sem veículo que rodasse no período. */
+  custoDiretoSemViagem: number
 }
 
 /** Primeiro e último instante de um mês, em UTC. */
@@ -136,44 +138,70 @@ export async function calcularResultado(
 ): Promise<ResultadoPeriodo> {
   const periodo = { gte: inicio, lte: fim }
 
-  const [viagens, fretesAgregado, lancamentosVeiculo, lancamentosOverhead] =
-    await Promise.all([
-      prisma.viagem.findMany({
-        where: { dataSaida: periodo },
-        include: {
-          veiculo: { select: { id: true, apelido: true } },
-          motorista: { select: { percentualComissao: true, baseComissao: true } },
-          fretes: { select: { valorFreteReal: true, valorCte: true } },
-          lancamentos: {
-            where: { tipo: 'DESPESA', categoria: { nivelCusto: 'DIRETO_VIAGEM' } },
-            select: { valor: true },
+  const [
+    viagens,
+    fretesAgregado,
+    lancamentosVeiculo,
+    lancamentosDiretosSoltos,
+    lancamentosOverhead,
+  ] = await Promise.all([
+    prisma.viagem.findMany({
+      where: { dataSaida: periodo },
+      include: {
+        veiculo: { select: { id: true, apelido: true } },
+        motorista: { select: { percentualComissao: true, baseComissao: true } },
+        fretes: {
+          where: { status: { not: 'CANCELADO' } },
+          select: { valorFreteReal: true, valorCte: true },
+        },
+        lancamentos: {
+          where: {
+            tipo: 'DESPESA',
+            categoria: { nivelCusto: 'DIRETO_VIAGEM' },
+            status: { not: 'CANCELADO' },
           },
-          abastecimentos: { select: { litros: true } },
+          select: { valor: true },
         },
-      }),
-      prisma.frete.findMany({
-        where: { modalidade: 'AGREGADO', dataEmissao: periodo, status: { not: 'CANCELADO' } },
-        select: { valorComissaoAgregado: true, valorSeguroAgregado: true },
-      }),
-      prisma.lancamento.findMany({
-        where: {
-          tipo: 'DESPESA',
-          dataCompetencia: periodo,
-          categoria: { nivelCusto: 'VEICULO' },
-          status: { not: 'CANCELADO' },
-        },
-        select: { valor: true, veiculoId: true },
-      }),
-      prisma.lancamento.aggregate({
-        _sum: { valor: true },
-        where: {
-          tipo: 'DESPESA',
-          dataCompetencia: periodo,
-          categoria: { nivelCusto: 'OVERHEAD' },
-          status: { not: 'CANCELADO' },
-        },
-      }),
-    ])
+        abastecimentos: { select: { litros: true } },
+      },
+    }),
+    prisma.frete.findMany({
+      where: { modalidade: 'AGREGADO', dataEmissao: periodo, status: { not: 'CANCELADO' } },
+      select: { valorComissaoAgregado: true, valorSeguroAgregado: true },
+    }),
+    prisma.lancamento.findMany({
+      where: {
+        tipo: 'DESPESA',
+        dataCompetencia: periodo,
+        categoria: { nivelCusto: 'VEICULO' },
+        status: { not: 'CANCELADO' },
+      },
+      select: { valor: true, veiculoId: true },
+    }),
+    // Diesel, pedágio e despesa de estrada lançados fora de uma viagem — é o
+    // que acontece quando o custo entra pelo menu Custos, e não pela tela da
+    // viagem. O dinheiro saiu do caixa igual; ignorá-los aqui inflava a
+    // margem em cima de um custo que o contas a pagar já cobrava.
+    prisma.lancamento.findMany({
+      where: {
+        tipo: 'DESPESA',
+        dataCompetencia: periodo,
+        categoria: { nivelCusto: 'DIRETO_VIAGEM' },
+        viagemId: null,
+        status: { not: 'CANCELADO' },
+      },
+      select: { valor: true, veiculoId: true },
+    }),
+    prisma.lancamento.aggregate({
+      _sum: { valor: true },
+      where: {
+        tipo: 'DESPESA',
+        dataCompetencia: periodo,
+        categoria: { nivelCusto: 'OVERHEAD' },
+        status: { not: 'CANCELADO' },
+      },
+    }),
+  ])
 
   // Custo de veículo agrupado, para casar com as viagens de cada um.
   const custoPorVeiculo = new Map<string, number>()
@@ -186,6 +214,20 @@ export async function calcularResultado(
     custoPorVeiculo.set(
       lancamento.veiculoId,
       (custoPorVeiculo.get(lancamento.veiculoId) ?? 0) + Number(lancamento.valor),
+    )
+  }
+
+  // Mesmo agrupamento para o custo direto que não tem viagem.
+  const diretoPorVeiculo = new Map<string, number>()
+  let custoDiretoSemDono = 0
+  for (const lancamento of lancamentosDiretosSoltos) {
+    if (!lancamento.veiculoId) {
+      custoDiretoSemDono += Number(lancamento.valor)
+      continue
+    }
+    diretoPorVeiculo.set(
+      lancamento.veiculoId,
+      (diretoPorVeiculo.get(lancamento.veiculoId) ?? 0) + Number(lancamento.valor),
     )
   }
 
@@ -227,6 +269,16 @@ export async function calcularResultado(
 
   // Custo do veículo entra por inteiro no resultado do próprio veículo — não
   // há rateio a fazer aqui, o lançamento já sabe de quem é.
+  let custoDiretoSemViagem = custoDiretoSemDono
+  for (const [veiculoId, custo] of diretoPorVeiculo) {
+    const linha = porVeiculo.get(veiculoId)
+    if (linha) {
+      linha.custoDireto += custo
+    } else {
+      custoDiretoSemViagem += custo
+    }
+  }
+
   let custoVeiculoSemViagem = custoVeiculoSemDono
   for (const [veiculoId, custo] of custoPorVeiculo) {
     const linha = porVeiculo.get(veiculoId)
@@ -278,7 +330,9 @@ export async function calcularResultado(
     ),
   )
 
-  const margemPropria = arredondar(propria.receita - propria.custoDireto)
+  const margemPropria = arredondar(
+    propria.receita - propria.custoDireto - custoDiretoSemViagem,
+  )
   const resultadoPropria = arredondar(margemPropria - propria.custoVeiculo - custoVeiculoSemViagem)
   const overhead = arredondar(Number(lancamentosOverhead._sum.valor ?? 0))
 
@@ -287,7 +341,7 @@ export async function calcularResultado(
     fim,
     propria: {
       receita: arredondar(propria.receita),
-      custoDireto: arredondar(propria.custoDireto),
+      custoDireto: arredondar(propria.custoDireto + custoDiretoSemViagem),
       margemContribuicao: margemPropria,
       custoVeiculo: arredondar(propria.custoVeiculo + custoVeiculoSemViagem),
       resultado: resultadoPropria,
@@ -306,6 +360,7 @@ export async function calcularResultado(
     lucroOperacional: arredondar(resultadoPropria + receitaAgregado - overhead),
     porVeiculo: linhas,
     custoVeiculoSemViagem: arredondar(custoVeiculoSemViagem),
+    custoDiretoSemViagem: arredondar(custoDiretoSemViagem),
   }
 }
 
@@ -326,41 +381,65 @@ export async function calcularResultadoPorFrete(
 ): Promise<LinhaFrete[]> {
   const periodo = { gte: inicio, lte: fim }
 
-  const [viagens, lancamentosVeiculo, fretesAgregado] = await Promise.all([
-    prisma.viagem.findMany({
-      where: { dataSaida: periodo },
-      include: {
-        veiculo: { select: { id: true, apelido: true } },
-        motorista: { select: { percentualComissao: true, baseComissao: true } },
-        fretes: {
-          include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
+  const [viagens, lancamentosVeiculo, lancamentosDiretosSoltos, fretesAgregado] =
+    await Promise.all([
+      prisma.viagem.findMany({
+        where: { dataSaida: periodo },
+        include: {
+          veiculo: { select: { id: true, apelido: true } },
+          motorista: { select: { percentualComissao: true, baseComissao: true } },
+          fretes: {
+            where: { status: { not: 'CANCELADO' } },
+            include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
+          },
+          lancamentos: {
+            where: {
+              tipo: 'DESPESA',
+              categoria: { nivelCusto: 'DIRETO_VIAGEM' },
+              status: { not: 'CANCELADO' },
+            },
+            select: { valor: true },
+          },
         },
-        lancamentos: {
-          where: { tipo: 'DESPESA', categoria: { nivelCusto: 'DIRETO_VIAGEM' } },
-          select: { valor: true },
+      }),
+      prisma.lancamento.findMany({
+        where: {
+          tipo: 'DESPESA',
+          dataCompetencia: periodo,
+          categoria: { nivelCusto: 'VEICULO' },
+          status: { not: 'CANCELADO' },
         },
-      },
-    }),
-    prisma.lancamento.findMany({
-      where: {
-        tipo: 'DESPESA',
-        dataCompetencia: periodo,
-        categoria: { nivelCusto: 'VEICULO' },
-        status: { not: 'CANCELADO' },
-      },
-      select: { valor: true, veiculoId: true },
-    }),
-    prisma.frete.findMany({
-      where: { modalidade: 'AGREGADO', dataEmissao: periodo, status: { not: 'CANCELADO' } },
-      include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
-    }),
-  ])
+        select: { valor: true, veiculoId: true },
+      }),
+      prisma.lancamento.findMany({
+        where: {
+          tipo: 'DESPESA',
+          dataCompetencia: periodo,
+          categoria: { nivelCusto: 'DIRETO_VIAGEM' },
+          viagemId: null,
+          status: { not: 'CANCELADO' },
+        },
+        select: { valor: true, veiculoId: true },
+      }),
+      prisma.frete.findMany({
+        where: { modalidade: 'AGREGADO', dataEmissao: periodo, status: { not: 'CANCELADO' } },
+        include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
+      }),
+    ])
 
   // Custo por km de cada veículo no período.
   const custoVeiculoMes = new Map<string, number>()
   for (const l of lancamentosVeiculo) {
     if (!l.veiculoId) continue
     custoVeiculoMes.set(l.veiculoId, (custoVeiculoMes.get(l.veiculoId) ?? 0) + Number(l.valor))
+  }
+  // Custo direto sem viagem: o lançamento sabe o caminhão, mas não a viagem.
+  // Vai por km, como o custo do veículo — só que na camada de cima, porque
+  // diesel não é custo de posse.
+  const diretoSoltoMes = new Map<string, number>()
+  for (const l of lancamentosDiretosSoltos) {
+    if (!l.veiculoId) continue
+    diretoSoltoMes.set(l.veiculoId, (diretoSoltoMes.get(l.veiculoId) ?? 0) + Number(l.valor))
   }
   const kmMes = new Map<string, number>()
   for (const v of viagens) {
@@ -380,6 +459,9 @@ export async function calcularResultadoPorFrete(
     const custoKm =
       kmDoVeiculo > 0 ? (custoVeiculoMes.get(viagem.veiculo.id) ?? 0) / kmDoVeiculo : 0
     const custoVeiculoViagem = custoKm * kmViagem
+    const diretoSoltoKm =
+      kmDoVeiculo > 0 ? (diretoSoltoMes.get(viagem.veiculo.id) ?? 0) / kmDoVeiculo : 0
+    const custoDiretoViagemTotal = custoDiretoViagem + diretoSoltoKm * kmViagem
 
     for (const frete of viagem.fretes) {
       // Sem receita na viagem, divide igualmente para não perder o custo.
@@ -388,7 +470,7 @@ export async function calcularResultadoPorFrete(
           ? Number(frete.valorFreteReal) / receitaViagem
           : 1 / viagem.fretes.length
 
-      const custoDireto = arredondar(custoDiretoViagem * proporcao)
+      const custoDireto = arredondar(custoDiretoViagemTotal * proporcao)
       const custoVeiculo = arredondar(custoVeiculoViagem * proporcao)
       const receita = Number(frete.valorFreteReal)
 

@@ -81,18 +81,22 @@ export async function fecharViagem(
   const { kmFinal, kmCarregado, dataChegada, kmImprodutivo, motivoKmImprodutivo } =
     validado.dados
 
-  if (kmFinal < viagem.kmInicial) {
+  // Quem fecha a viagem está com o painel à vista: é a hora de corrigir também
+  // a saída, que numa viagem importada de MDF-e veio do cadastro do caminhão.
+  const kmSaida = validado.dados.kmInicial ?? viagem.kmInicial
+
+  if (kmFinal < kmSaida) {
     return {
       erroGeral: 'Confira os campos destacados.',
       errosPorCampo: {
         kmFinal: [
-          `A chegada não pode ser menor que a saída (${viagem.kmInicial.toLocaleString('pt-BR')} km).`,
+          `A chegada não pode ser menor que a saída (${kmSaida.toLocaleString('pt-BR')} km).`,
         ],
       },
     }
   }
 
-  const km = calcularKm(viagem.kmInicial, kmFinal, kmCarregado)
+  const km = calcularKm(kmSaida, kmFinal, kmCarregado)
 
   try {
     await prisma.$transaction([
@@ -100,6 +104,7 @@ export async function fecharViagem(
         where: { id },
         data: {
           dataChegada,
+          kmInicial: kmSaida,
           kmFinal,
           kmCarregado: km.carregado ?? null,
           kmVazio: km.vazio ?? null,
@@ -127,9 +132,28 @@ export async function fecharViagem(
   return { ok: true }
 }
 
+/**
+ * Reabre uma viagem fechada.
+ *
+ * É o caminho de volta para o custo que chegou depois: nota do borracheiro na
+ * semana seguinte, pedágio que veio na fatura do mês. Sem isso o custo ia parar
+ * no menu Custos sem viagem, e a margem daquela viagem ficava alta para sempre.
+ *
+ * Viagem cujo frete já entrou num acerto de motorista não reabre: mexer nos
+ * valores depois do acerto fechado deixaria um pagamento sem lastro.
+ */
 export async function reabrirViagem(id: string): Promise<EstadoFormulario> {
   await exigirAcesso('operacao')
   try {
+    const acertados = await prisma.frete.count({
+      where: { viagemId: id, acertoMotoristaId: { not: null } },
+    })
+    if (acertados > 0) {
+      return {
+        erroGeral:
+          'Os fretes desta viagem já entraram num acerto de motorista. Refaça o acerto antes de reabrir.',
+      }
+    }
     await prisma.viagem.update({ where: { id }, data: { status: 'EM_ANDAMENTO' } })
   } catch (erro) {
     return traduzirErroPrisma(erro)

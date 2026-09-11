@@ -54,7 +54,7 @@ async function main() {
 
   // --- 1. Ler sem estragar -------------------------------------------------
   const chaveCte = montarChave('57', 432)
-  const xml = montarMdfe({
+  const baseManifesto = {
     numero: '387',
     chaveMdfe: montarChave('58', 387),
     chaveCte,
@@ -71,7 +71,8 @@ async function main() {
     vContrato: 5970,
     vCarga: 390630.78,
     qCarga: 20500,
-  })
+  }
+  const xml = montarMdfe(baseManifesto)
 
   const m = lerManifesto(xml)
   checar('lê um MDF-e', m !== null)
@@ -96,7 +97,19 @@ async function main() {
   checar('peso em quilos', m?.pesoKg === 20500)
   checar(
     'a data da viagem é a de início, não a de emissão',
-    m?.dataViagem.toISOString().startsWith('2026-09-04T14:40') === true,
+    m?.dataViagem.toISOString().slice(0, 10) === '2026-09-04',
+    m?.dataViagem.toISOString() ?? 'nulo',
+  )
+  // O manifesto emitido de noite em Mato Grosso (UTC−4) vira o dia seguinte se
+  // a data for convertida para UTC antes de ser truncada. No último dia do mês
+  // isso mudava o resultado de dois períodos de uma vez.
+  const noturno = lerManifesto(
+    montarMdfe({ ...baseManifesto, numero: '99', dhEmi: '2026-09-30T21:15:00-04:00' }),
+  )
+  checar(
+    'manifesto da noite não escorrega para o dia seguinte',
+    noturno?.dataEmissao.toISOString().slice(0, 10) === '2026-09-30',
+    noturno?.dataEmissao.toISOString() ?? 'nulo',
   )
   checar('sem dono declarado, o caminhão é da frota', m !== null && !ehAgregado(m))
 

@@ -8,6 +8,26 @@ import { salvarFreteProprio } from './actions'
 
 const hoje = () => new Date().toISOString().slice(0, 10)
 
+/** Um frete já gravado, com tudo em texto do jeito que o formulário consome. */
+export type FreteProprioExistente = {
+  id: string
+  clienteId: string
+  dataEmissao: string
+  numeroCte: string
+  serie: string
+  origem: string
+  destino: string
+  produto: string
+  cabecas: string
+  pesoKg: string
+  dataEntrega: string
+  valorCte: string
+  valorFreteReal: string
+  valorPedagioDestacado: string
+  valorIcms: string
+  observacoes: string
+}
+
 /**
  * Frete de caminhão da Lysor.
  *
@@ -22,15 +42,19 @@ export function FormularioFreteProprio({
   origemPadrao,
   destinoPadrao,
   clientes,
+  frete,
 }: {
   viagemId: string
   origemPadrao: string
   destinoPadrao: string
   clientes: Array<{ id: string; nome: string }>
+  /** Presente só na correção de um frete já lançado. */
+  frete?: FreteProprioExistente
 }) {
-  const [valorCte, setValorCte] = useState('')
-  const [valorReal, setValorReal] = useState('')
-  const [tocouNoReal, setTocouNoReal] = useState(false)
+  const [valorCte, setValorCte] = useState(frete?.valorCte ?? '')
+  const [valorReal, setValorReal] = useState(frete?.valorFreteReal ?? '')
+  // Na correção os dois valores já existem e não se acompanham mais.
+  const [tocouNoReal, setTocouNoReal] = useState(frete !== undefined)
 
   // Enquanto o operador não mexer no valor real, ele acompanha o do CT-e.
   const realEfetivo = tocouNoReal ? valorReal : valorCte
@@ -45,15 +69,16 @@ export function FormularioFreteProprio({
     <Formulario
       action={salvarFreteProprio}
       voltarPara={rota(`/viagens/${viagemId}`)}
-      rotuloSalvar="Lançar frete"
+      rotuloSalvar={frete ? 'Salvar correção' : 'Lançar frete'}
     >
       {(erros) => (
         <>
           <input type="hidden" name="viagemId" value={viagemId} />
+          {frete && <input type="hidden" name="id" value={frete.id} />}
 
           <Card className="grid gap-4 p-4 sm:grid-cols-2">
             <Campo label="Cliente" obrigatorio erro={erros.clienteId}>
-              <Select name="clienteId" required autoFocus>
+              <Select name="clienteId" defaultValue={frete?.clienteId ?? ''} required autoFocus>
                 <option value="">Selecione…</option>
                 {clientes.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -64,39 +89,54 @@ export function FormularioFreteProprio({
             </Campo>
 
             <Campo label="Data de emissão" obrigatorio erro={erros.dataEmissao}>
-              <Input name="dataEmissao" type="date" defaultValue={hoje()} required />
+              <Input
+                name="dataEmissao"
+                type="date"
+                defaultValue={frete?.dataEmissao ?? hoje()}
+                required
+              />
             </Campo>
 
             <Campo label="Número do CT-e" erro={erros.numeroCte}>
-              <Input name="numeroCte" inputMode="numeric" />
+              <Input name="numeroCte" inputMode="numeric" defaultValue={frete?.numeroCte} />
             </Campo>
 
             <Campo label="Série" erro={erros.serie}>
-              <Input name="serie" inputMode="numeric" />
+              <Input name="serie" inputMode="numeric" defaultValue={frete?.serie} />
             </Campo>
 
             <Campo label="Origem" obrigatorio erro={erros.origem}>
-              <Input name="origem" defaultValue={origemPadrao} required />
+              <Input name="origem" defaultValue={frete?.origem ?? origemPadrao} required />
             </Campo>
 
             <Campo label="Destino" obrigatorio erro={erros.destino}>
-              <Input name="destino" defaultValue={destinoPadrao} required />
+              <Input name="destino" defaultValue={frete?.destino ?? destinoPadrao} required />
             </Campo>
 
             <Campo label="Produto" erro={erros.produto}>
-              <Input name="produto" defaultValue="Bovinos" />
+              <Input name="produto" defaultValue={frete?.produto ?? 'Bovinos'} />
             </Campo>
 
             <Campo label="Cabeças" erro={erros.cabecas}>
-              <Input name="cabecas" type="number" inputMode="numeric" />
+              <Input
+                name="cabecas"
+                type="number"
+                inputMode="numeric"
+                defaultValue={frete?.cabecas}
+              />
             </Campo>
 
             <Campo label="Peso (kg)" erro={erros.pesoKg}>
-              <Input name="pesoKg" type="number" inputMode="numeric" />
+              <Input
+                name="pesoKg"
+                type="number"
+                inputMode="numeric"
+                defaultValue={frete?.pesoKg}
+              />
             </Campo>
 
             <Campo label="Data de entrega" erro={erros.dataEntrega}>
-              <Input name="dataEntrega" type="date" />
+              <Input name="dataEntrega" type="date" defaultValue={frete?.dataEntrega} />
             </Campo>
           </Card>
 
@@ -151,15 +191,22 @@ export function FormularioFreteProprio({
                 type="number"
                 step="0.01"
                 inputMode="decimal"
+                defaultValue={frete?.valorPedagioDestacado}
               />
             </Campo>
 
             <Campo label="ICMS" erro={erros.valorIcms}>
-              <Input name="valorIcms" type="number" step="0.01" inputMode="decimal" />
+              <Input
+                name="valorIcms"
+                type="number"
+                step="0.01"
+                inputMode="decimal"
+                defaultValue={frete?.valorIcms}
+              />
             </Campo>
 
             <Campo label="Observações" erro={erros.observacoes}>
-              <Textarea name="observacoes" />
+              <Textarea name="observacoes" defaultValue={frete?.observacoes} />
             </Campo>
           </Card>
         </>

@@ -197,11 +197,22 @@ export async function fecharAcertoMotorista(
   })
 
   // A trava contra pagar duas vezes. Feita na mesma transação do título: ou as
-  // duas coisas acontecem, ou nenhuma.
-  await tx.frete.updateMany({
-    where: { id: { in: calculado.fretes.map((f) => f.freteId) } },
+  // duas coisas acontecem, ou nenhuma. O `acertoMotoristaId: null` no filtro é
+  // o que fecha a janela entre o cálculo (que roda fora da transação, na tela)
+  // e o fechamento: se outro acerto pegou o mesmo frete nesse meio-tempo, a
+  // conta não bate e a transação inteira volta atrás.
+  const marcados = await tx.frete.updateMany({
+    where: {
+      id: { in: calculado.fretes.map((f) => f.freteId) },
+      acertoMotoristaId: null,
+    },
     data: { acertoMotoristaId: acerto.id },
   })
+  if (marcados.count !== calculado.fretes.length) {
+    throw new Error(
+      'Algum frete deste período já entrou em outro acerto. Recarregue a tela.',
+    )
+  }
 
   return { acertoId: acerto.id, lancamentoId: titulo.id, liquido }
 }
@@ -356,15 +367,25 @@ export async function fecharAcertoAgregado(
     throw new Error('Algum título já foi acertado ou não é deste agregado. Recarregue a tela.')
   }
 
-  let bruto = 0
+  /*
+    Os dois fluxos caem na mesma lista com sinais opostos: no INTERMEDIADO a
+    Lysor recebeu do cliente e repassa (DESPESA); no DIRETO o agregado recebeu
+    e deve a comissão (RECEITA). Somar os dois no mesmo balde registrava um
+    acerto maior do que o dinheiro que trocou de mão. O bruto aqui é o líquido
+    do encontro de contas: positivo é repasse, negativo é cobrança.
+  */
+  let aPagar = 0
+  let aReceber = 0
   let comissao = 0
   let seguro = 0
   for (const t of titulos) {
-    bruto += arredondar(Number(t.valor) - Number(t.valorPago))
+    const saldo = arredondar(Number(t.valor) - Number(t.valorPago))
+    if (t.tipo === 'DESPESA') aPagar += saldo
+    else aReceber += saldo
     comissao += Number(t.frete?.valorComissaoAgregado ?? 0)
     seguro += Number(t.frete?.valorSeguroAgregado ?? 0)
   }
-  bruto = arredondar(bruto)
+  const bruto = arredondar(aPagar - aReceber)
 
   const datas = titulos.map((t) => t.dataCompetencia.getTime())
   const acerto = await tx.acerto.create({

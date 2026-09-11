@@ -5,7 +5,7 @@ import { TabelaTitulos } from '../tabela-titulos'
 export const dynamic = 'force-dynamic'
 
 export default async function ContasAPagar() {
-  const titulos = await listarTitulos('DESPESA', { apenasAbertos: true })
+  const lista = await listarTitulos('DESPESA', { apenasAbertos: true })
 
   return (
     <>
@@ -14,7 +14,9 @@ export default async function ContasAPagar() {
         descricao="Gerado automaticamente a cada custo lançado."
       />
       <TabelaTitulos
-        titulos={titulos}
+        titulos={lista.titulos}
+        total={lista.total}
+        naoExibidos={lista.naoExibidos}
         tipo="DESPESA"
         vazio={{
           titulo: 'Nada a pagar',

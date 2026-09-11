@@ -81,6 +81,26 @@ function lista<T>(valor: T | T[] | undefined | null): T[] {
 }
 
 /**
+ * Data de um campo `dhEmi`/`dhIniViagem` como dia de calendário.
+ *
+ * O XML traz `2026-09-30T21:15:00-04:00`. `new Date()` disso é 01/10 em UTC, e
+ * as colunas de data do banco são `date` truncado em UTC — o manifesto emitido
+ * à noite caía no dia seguinte, e no fim do mês caía no mês seguinte, mudando
+ * o resultado de dois períodos de uma vez. O dia que vale é o declarado no
+ * documento, no fuso do documento: os dez primeiros caracteres.
+ */
+function dataDoDocumento(valor: string | null | undefined): Date {
+  const casa = valor?.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!casa) {
+    const agora = new Date()
+    return new Date(
+      Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate()),
+    )
+  }
+  return new Date(Date.UTC(Number(casa[1]), Number(casa[2]) - 1, Number(casa[3])))
+}
+
+/**
  * Lê um XML de MDF-e. Devolve `null` quando o arquivo não é um MDF-e — o que
  * acontece o tempo todo, porque o emissor exporta o manifesto e os eventos de
  * encerramento na mesma pasta, e a pessoa vai selecionar tudo.
@@ -116,8 +136,8 @@ export function lerManifesto(xml: string): ManifestoLido | null {
   return {
     chaveMdfe: (texto(inf['@Id']) ?? '').replace(/^MDFe/, ''),
     numero: texto(inf.ide.nMDF) ?? '',
-    dataEmissao: new Date(dhEmi ?? Date.now()),
-    dataViagem: new Date(dhViagem ?? Date.now()),
+    dataEmissao: dataDoDocumento(dhEmi),
+    dataViagem: dataDoDocumento(dhViagem),
     origem: texto(inf.ide.infMunCarrega?.xMunCarrega) ?? '',
     destino: descargas.map((d) => texto(d.xMunDescarga)).filter(Boolean).join(', ') || '',
     chaveCte,

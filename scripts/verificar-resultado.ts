@@ -238,6 +238,95 @@ async function main() {
     `R$ ${arredondar(f1.resultado + f2.resultado)} = R$ ${r.propria.resultado}`,
   )
 
+
+  // --- Custo direto lançado fora da viagem ---------------------------------
+  // O menu Custos grava `viagemId: null`. Antes desta verificação o DRE só lia
+  // custo direto pelo `include` da viagem, então R$ 3.000 de diesel entravam no
+  // contas a pagar e não mexiam um centavo no lucro do mês. A margem ficava
+  // bonita em cima de um custo que existia.
+  const lancarSolto = async (valor: number, comVeiculo: boolean) =>
+    prisma.lancamento.create({
+      data: {
+        tipo: 'DESPESA',
+        categoriaId: await cat('Combustível'),
+        descricao: `Diesel avulso ${MARCA}`,
+        valor: new Prisma.Decimal(valor),
+        dataCompetencia: new Date(Date.UTC(ANO, MES - 1, 22)),
+        dataVencimento: new Date(Date.UTC(ANO, MES - 1, 28)),
+        viagemId: null,
+        veiculoId: comVeiculo ? veiculo.id : null,
+      },
+    })
+
+  await lancarSolto(900, true)
+  const comSolto = await calcularResultado(inicio, fim)
+  checar(
+    'diesel lançado pelo menu Custos entra no custo direto do caminhão',
+    comSolto.porVeiculo[0]?.custoDireto === 6000,
+    `R$ ${comSolto.porVeiculo[0]?.custoDireto} (5.100 + 900)`,
+  )
+  checar(
+    'e derruba a margem no mesmo valor',
+    comSolto.propria.margemContribuicao === 9000 && comSolto.lucroOperacional === 3040,
+    `margem R$ ${comSolto.propria.margemContribuicao}, lucro R$ ${comSolto.lucroOperacional}`,
+  )
+  checar(
+    'com caminhão conhecido, nada sobra no balde de "sem viagem"',
+    comSolto.custoDiretoSemViagem === 0,
+    `R$ ${comSolto.custoDiretoSemViagem}`,
+  )
+
+  await lancarSolto(100, false)
+  const comOrfao = await calcularResultado(inicio, fim)
+  checar(
+    'custo direto sem viagem e sem caminhão vai para o balde, mas entra no resultado',
+    comOrfao.custoDiretoSemViagem === 100 && comOrfao.propria.custoDireto === 6100,
+    `balde R$ ${comOrfao.custoDiretoSemViagem}, custo direto R$ ${comOrfao.propria.custoDireto}`,
+  )
+  checar(
+    'e o lucro operacional cai os R$ 100',
+    comOrfao.lucroOperacional === 2940,
+    `R$ ${comOrfao.lucroOperacional}`,
+  )
+
+  const porFreteSolto = await calcularResultadoPorFrete(inicio, fim)
+  const s1 = porFreteSolto.find((f) => f.numeroCte === '1001')!
+  const s2 = porFreteSolto.find((f) => f.numeroCte === '1002')!
+  checar(
+    'no rateio por frete o diesel avulso segue o km do caminhão',
+    s1.custoDiretoRateado === 4000 && s2.custoDiretoRateado === 2000,
+    `R$ ${s1.custoDiretoRateado} e R$ ${s2.custoDiretoRateado} de R$ 6.000`,
+  )
+  checar(
+    'e a soma por frete só não fecha pelo que não tem dono — de propósito',
+    arredondar(s1.resultado + s2.resultado) - comOrfao.custoDiretoSemViagem ===
+      comOrfao.propria.resultado,
+    `R$ ${arredondar(s1.resultado + s2.resultado)} − R$ ${comOrfao.custoDiretoSemViagem}`,
+  )
+
+  // --- Frete cancelado ------------------------------------------------------
+  // `excluirFrete` cancela em vez de apagar quando já existe título. CT-e
+  // cancelado não vale nada: nem receita, nem base de comissão.
+  await prisma.frete.updateMany({
+    where: { numeroCte: '1002', observacoes: MARCA },
+    data: { status: 'CANCELADO' },
+  })
+  const semCancelado = await calcularResultado(inicio, fim)
+  checar(
+    'frete cancelado sai da receita',
+    semCancelado.propria.receita === 10000,
+    `R$ ${semCancelado.propria.receita}`,
+  )
+  checar(
+    'e sai também da base da comissão do motorista',
+    semCancelado.porVeiculo[0]?.custoDireto === 5400,
+    `R$ ${semCancelado.porVeiculo[0]?.custoDireto} (3.000 + 300 + 900 + 12% de 10.000)`,
+  )
+  checar(
+    'e some da lista por frete',
+    (await calcularResultadoPorFrete(inicio, fim)).every((f) => f.numeroCte !== '1002'),
+  )
+
   console.log(falhas === 0 ? '\nResultado verificado.' : `\n${falhas} falha(s).`)
   await prisma.$disconnect()
   process.exit(falhas === 0 ? 0 : 1)
