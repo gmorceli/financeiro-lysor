@@ -89,6 +89,13 @@ Ele **não** carrega a frota de exemplo do `db:seed`. Veículo não se apaga nes
 sistema — sai de operação mudando de status e continua na lista para sempre.
 Oito caminhões com placa inventada seriam oito linhas para a cliente conviver.
 
+Enquanto o administrador criado assim **ainda não tiver feito o primeiro
+acesso**, mudar `ADMIN_EMAIL` ou `ADMIN_NOME` e reimplantar corrige a identidade
+dele. Sem isso, um e-mail digitado errado na primeira subida é uma tranca sem
+saída: o e-mail é como se entra, a tela de usuários exige estar logado, e no
+deploy não há terminal com acesso ao banco. Assim que alguém entra e escolhe a
+senha, essa porta fecha para sempre e trocar e-mail passa a ser pela tela.
+
 Variáveis necessárias: `DATABASE_URL` e `DIRECT_URL`. Depois do primeiro acesso,
 remova `ADMIN_SENHA` do painel: ela não serve mais para nada.
 

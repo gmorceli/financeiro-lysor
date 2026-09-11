@@ -46,15 +46,16 @@ async function main() {
     })
   }
 
-  const quantos = await prisma.usuario.count()
-  if (quantos > 0) {
-    console.log(`Produção preparada: ${await prisma.categoria.count()} categorias, ${quantos} usuário(s) — nenhum criado.`)
-    return
-  }
-
   const email = process.env.ADMIN_EMAIL?.trim().toLowerCase()
   const senha = process.env.ADMIN_SENHA
   const nome = process.env.ADMIN_NOME?.trim() || 'Administrador'
+
+  const quantos = await prisma.usuario.count()
+  if (quantos > 0) {
+    if (email) await corrigirAdminAindaNaoUsado(email, nome)
+    console.log(`Produção preparada: ${await prisma.categoria.count()} categorias, ${quantos} usuário(s) — nenhum criado.`)
+    return
+  }
 
   if (!email || !senha) {
     console.log(
@@ -81,6 +82,44 @@ async function main() {
     },
   })
   console.log(`Produção preparada. Administrador ${email} criado com senha provisória.`)
+}
+
+/**
+ * Corrige a identidade do administrador de bootstrap enquanto ninguém entrou.
+ *
+ * Sem isto, errar o `ADMIN_EMAIL` na primeira subida é uma tranca sem saída:
+ * o e-mail é como se entra, a tela de usuários exige estar logado, e no deploy
+ * não há terminal com acesso ao banco. Quem digitou errado fica de fora do
+ * próprio sistema, e a única saída é mexer no banco na mão.
+ *
+ * As três condições são estreitas de propósito — só vale enquanto a instalação
+ * ainda está sendo montada:
+ *
+ * 1. existe um único usuário (ninguém montou equipe ainda);
+ * 2. ele é o administrador;
+ * 3. a senha dele **ainda é provisória**, ou seja, ninguém nunca completou um
+ *    primeiro acesso.
+ *
+ * Depois que alguém entra e escolhe a senha, a condição 3 cai para sempre e
+ * este caminho nunca mais roda — trocar e-mail passa a ser pela tela, como
+ * deve. A senha não é tocada aqui: a provisória continua valendo.
+ */
+async function corrigirAdminAindaNaoUsado(email: string, nome: string) {
+  const unico = await prisma.usuario.findFirst({
+    select: { id: true, email: true, nome: true, perfil: true, trocarSenha: true },
+  })
+  if (!unico) return
+  if ((await prisma.usuario.count()) !== 1) return
+  if (unico.perfil !== 'ADMIN' || !unico.trocarSenha) return
+  if (unico.email === email && unico.nome === nome) return
+
+  await prisma.usuario.update({ where: { id: unico.id }, data: { email, nome } })
+  // Sessão aberta com a identidade antiga não continua valendo.
+  await prisma.sessao.deleteMany({ where: { usuarioId: unico.id } })
+  console.log(
+    `Administrador de bootstrap corrigido: ${unico.email} → ${email}. ` +
+      'A senha provisória continua a mesma; as sessões abertas foram encerradas.',
+  )
 }
 
 main()
