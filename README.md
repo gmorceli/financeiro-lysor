@@ -99,7 +99,7 @@ senha, essa porta fecha para sempre e trocar e-mail passa a ser pela tela.
 Variáveis necessárias: `DATABASE_URL` e `DIRECT_URL`. Depois do primeiro acesso,
 remova `ADMIN_SENHA` do painel: ela não serve mais para nada.
 
-Verificações — **158 asserções contra um Postgres de verdade**:
+Verificações — **185 asserções contra um Postgres de verdade**:
 
 ```bash
 npm run typecheck         # tipos
@@ -108,6 +108,7 @@ npm run verificar:fluxo   # fluxo operacional contra o banco
 npm run verificar:custos  # custos, títulos e margem contra o banco
 npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
 npm run verificar:resultado   # cascata do DRE e rateio por frete
+npm run verificar:acertos     # acerto de motorista e de agregado
 npm run verificar:auth    # senha, sessão, bloqueio, permissão e guarda das actions
 npm run build             # build de produção
 ```
@@ -120,7 +121,7 @@ E mais duas verificações que exigem o servidor no ar e o Chromium instalado
 npm i -D playwright && npx playwright install chromium
 npm run build && npm start
 npm run verificar:navegador   # 29 asserções no formulário de verdade
-npm run verificar:mobile      # as 27 telas medidas em 375px
+npm run verificar:mobile      # as 30 telas medidas em 375px
 ```
 
 `verificar:mobile` é o que impede a promessa fácil de "é responsivo". Ele mede,
@@ -224,6 +225,32 @@ o rateio não perde nem inventa dinheiro.
   conferir o percentual e o seguro na hora de cadastrar.
 - **Nada é apagado**: veículo sai de operação mudando de status, porque carrega
   histórico de viagem e de custo.
+
+### Acerto de motorista e de agregado
+
+Os dois fecham de formas **opostas**, e a diferença é o miolo da fatia:
+
+- **Motorista** — a comissão nunca existiu como título. Ela é calculada frete a
+  frete e já entra no resultado no dia do frete, mas ninguém deve nada a ninguém
+  até o acerto. Fechar é o que cria a conta a pagar.
+- **Agregado** — os títulos já nasceram junto com o CT-e. Fechar não cria nada:
+  agrupa, mostra a conta e dá baixa. Criar título aqui duplicaria o dinheiro,
+  que é o erro clássico deste tipo de tela.
+
+Daí o nível de custo `LIQUIDACAO`, que só o acerto de motorista usa: o título
+dele entra no contas a pagar e no fluxo de caixa, e **não** entra no resultado,
+porque a comissão já foi apropriada por competência. Sem isso, fechar um acerto
+faria o lucro do mês cair por um custo que já estava lá — e o erro só apareceria
+no fechamento, quando ninguém mais lembra do que mudou.
+
+A asserção que guarda essa fronteira está em `verificar:acertos`: **fechar um
+acerto não muda o lucro operacional do período.** A gêmea, do outro lado:
+**fechar um acerto de agregado não cria título nenhum.**
+
+Na tela do agregado a escolha é por CT-e, um a um — que é como a cliente acerta,
+conforme o cliente paga. Vêm marcados os que já foram pagos; os outros aparecem
+desmarcados e sinalizados, porque esconder faria ela abrir o extrato do banco
+para descobrir por que o CT-e sumiu.
 
 ### Acesso
 

@@ -97,12 +97,21 @@ export function mesAtual() {
 }
 
 /**
- * Comissão do motorista de uma viagem.
+ * Comissão do motorista de uma viagem, por competência.
  *
- * Ainda não é um título — ela nasce no acerto, que é a próxima fatia — mas
- * entra no custo direto mesmo assim. Deixá-la de fora mostraria uma margem
- * inflada em cerca de 12% da receita, que é justamente o tipo de número
- * bonito e errado que este sistema existe para evitar.
+ * Entra no custo direto no dia do frete, muito antes de alguém pagar. Deixá-la
+ * de fora mostraria uma margem inflada em cerca de 12% da receita, que é
+ * justamente o tipo de número bonito e errado que este sistema existe para
+ * evitar.
+ *
+ * Conta **todos** os fretes, inclusive os já acertados. É o contrário do que
+ * parece intuitivo, e é o ponto que sustenta o acerto: o título que o acerto
+ * cria nasce na categoria de nível `LIQUIDACAO`, que nenhuma camada do DRE lê.
+ * Se esta função pulasse os fretes acertados, o custo sumiria do resultado no
+ * dia do pagamento — o lucro do mês subiria sozinho e ninguém saberia por quê.
+ *
+ * A invariante está no `verificar:acertos`: fechar um acerto não muda o
+ * resultado do período.
  */
 function comissaoDaViagem(viagem: {
   fretes: Array<{ valorFreteReal: unknown; valorCte: unknown }>

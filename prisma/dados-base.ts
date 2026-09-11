@@ -37,6 +37,9 @@ export const CATEGORIAS: Array<{
 
   // Overhead
   { nome: 'Salários e encargos', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
+  // Nível LIQUIDACAO: entra no caixa, não no resultado. A comissão que este
+  // título paga já foi apropriada frete a frete quando o frete aconteceu.
+  { nome: 'Acerto de motorista', tipo: 'DESPESA', nivelCusto: 'LIQUIDACAO' },
   { nome: 'Contador', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
   { nome: 'Sistemas e software', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },
   { nome: 'Internet e telefonia', tipo: 'DESPESA', nivelCusto: 'OVERHEAD' },

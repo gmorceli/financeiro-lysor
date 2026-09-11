@@ -96,6 +96,16 @@ enum NivelCusto {
   DIRETO_VIAGEM
   VEICULO
   OVERHEAD
+
+  /// Título que **liquida** um custo já apropriado por competência em outro
+  /// lugar — o caso é o acerto do motorista, cuja comissão o DRE já calcula
+  /// frete a frete no momento em que o frete acontece.
+  ///
+  /// Existe para o dinheiro aparecer no contas a pagar e no fluxo de caixa sem
+  /// aparecer de novo no resultado. Sem este nível, fechar um acerto faria o
+  /// lucro do mês cair por um custo que já estava lá — e o erro só apareceria
+  /// no fechamento, quando ninguém mais lembra do que mudou.
+  LIQUIDACAO
 }
 
 enum StatusLancamento {
@@ -480,6 +490,16 @@ model Frete {
   criadoEm     DateTime    @default(now())
   atualizadoEm DateTime    @updatedAt
 
+  /// Preenchido quando a comissão deste frete entrou num acerto fechado.
+  ///
+  /// Serve só como trava contra pagar a mesma comissão duas vezes. O DRE NÃO
+  /// consulta este campo: ele continua apropriando a comissão de todo frete por
+  /// competência, e o título gerado pelo acerto fica fora do resultado por ser
+  /// de nível `LIQUIDACAO`. Fosse o contrário, o custo sumiria no dia do
+  /// pagamento.
+  acertoMotoristaId String?
+
+  acertoMotorista  Acerto?       @relation(fields: [acertoMotoristaId], references: [id])
   viagem           Viagem?       @relation(fields: [viagemId], references: [id])
   cliente          Cliente       @relation(fields: [clienteId], references: [id])
   proprietario     Proprietario? @relation(fields: [proprietarioId], references: [id])
@@ -611,6 +631,11 @@ model Lancamento {
   criadoEm      DateTime         @default(now())
   atualizadoEm  DateTime         @updatedAt
 
+  /// Acerto de agregado que liquidou este título.
+  acertoId String?
+
+  acerto                 Acerto?       @relation("TitulosLiquidadosNoAcerto", fields: [acertoId], references: [id])
+  acertoGerado           Acerto?       @relation("TituloGeradoPeloAcerto")
   categoria              Categoria     @relation(fields: [categoriaId], references: [id])
   veiculo                Veiculo?      @relation(fields: [veiculoId], references: [id])
   viagem                 Viagem?       @relation(fields: [viagemId], references: [id])
@@ -629,7 +654,6 @@ model Lancamento {
   abastecimento Abastecimento?
   manutencao    Manutencao?
   fatura        Fatura?
-  acerto        Acerto?
 
   @@index([tipo, dataVencimento])
   @@index([dataCompetencia])
@@ -680,27 +704,60 @@ model Fatura {
 }
 
 /// Fechamento da viagem (motorista) ou do período (agregado).
+/// O papel que a cliente já preenchia à mão, agora somado pelo sistema.
+///
+/// Os dois tipos fecham de formas opostas, e é de propósito:
+///
+/// - **MOTORISTA**: a comissão existe como cálculo, nunca como título. Fechar o
+///   acerto é o que a transforma em conta a pagar — um título só, pelo líquido
+///   do período, na categoria de liquidação.
+/// - **AGREGADO**: os títulos já existem, um por frete, criados junto com o
+///   CT-e. Fechar o acerto não cria nada: ele agrupa, mostra a conta e dá baixa
+///   nos títulos escolhidos. Criar um título novo aqui duplicaria o dinheiro.
 model Acerto {
-  id                   String     @id @default(cuid())
-  tipo                 TipoAcerto
-  viagemId             String?    @unique
-  motoristaId          String?
-  proprietarioId       String?
-  valorBruto           Decimal    @db.Decimal(14, 2)
-  adiantamentos        Decimal    @default(0) @db.Decimal(14, 2)
-  descontos            Decimal    @default(0) @db.Decimal(14, 2)
-  despesasReembolsadas Decimal    @default(0) @db.Decimal(14, 2)
-  valorLiquido         Decimal    @db.Decimal(14, 2)
-  lancamentoId         String?    @unique
+  id             String     @id @default(cuid())
+  tipo           TipoAcerto
+  viagemId       String?    @unique
+  motoristaId    String?
+  proprietarioId String?
+
+  /// Competência do acerto. No motorista é o mês; no agregado é a janela dos
+  /// CT-e escolhidos.
+  periodoInicio DateTime @db.Date
+  periodoFim    DateTime @db.Date
+
+  /// Quebra do bruto, para o acerto impresso explicar de onde veio o número.
+  valorSalario  Decimal @default(0) @db.Decimal(14, 2)
+  valorComissao Decimal @default(0) @db.Decimal(14, 2)
+  valorSeguro   Decimal @default(0) @db.Decimal(14, 2)
+
+  valorBruto           Decimal   @db.Decimal(14, 2)
+  adiantamentos        Decimal   @default(0) @db.Decimal(14, 2)
+  descontos            Decimal   @default(0) @db.Decimal(14, 2)
+  despesasReembolsadas Decimal   @default(0) @db.Decimal(14, 2)
+  valorLiquido         Decimal   @db.Decimal(14, 2)
+  observacoes          String?
+  lancamentoId         String?   @unique
   fechadoEm            DateTime?
   fechadoPor           String?
-  criadoEm             DateTime   @default(now())
+  criadoEm             DateTime  @default(now())
 
   viagem       Viagem?       @relation(fields: [viagemId], references: [id])
   motorista    Motorista?    @relation(fields: [motoristaId], references: [id])
   proprietario Proprietario? @relation(fields: [proprietarioId], references: [id])
-  lancamento   Lancamento?   @relation(fields: [lancamentoId], references: [id])
 
+  /// O título gerado pelo acerto. Só o de motorista tem.
+  lancamento Lancamento? @relation("TituloGeradoPeloAcerto", fields: [lancamentoId], references: [id])
+
+  /// Os títulos que este acerto liquidou. Só o de agregado tem.
+  titulosLiquidados Lancamento[] @relation("TitulosLiquidadosNoAcerto")
+
+  /// Os fretes cuja comissão este acerto pagou. Só o de motorista tem — e é o
+  /// que impede pagar a mesma comissão duas vezes.
+  fretesComissionados Frete[]
+
+  @@index([motoristaId, periodoInicio])
+  @@index([proprietarioId, periodoInicio])
   @@map("acerto")
 }
 

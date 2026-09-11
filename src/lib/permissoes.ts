@@ -58,6 +58,7 @@ const NAVEGACAO: readonly ItemNavegacao[] = [
   { href: '/fretes', rotulo: 'Fretes', area: 'operacao' },
   { href: '/custos', rotulo: 'Custos', area: 'operacao' },
   { href: '/financeiro', rotulo: 'Financeiro', area: 'financeiro' },
+  { href: '/acertos', rotulo: 'Acertos', area: 'financeiro' },
   { href: '/relatorios', rotulo: 'Resultado', area: 'resultado' },
   { href: '/cadastros/veiculos', rotulo: 'Veículos', area: 'cadastros' },
   { href: '/cadastros/motoristas', rotulo: 'Motoristas', area: 'cadastros' },

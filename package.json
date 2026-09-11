@@ -22,6 +22,7 @@
     "verificar:custos": "tsx scripts/verificar-custos.ts",
     "verificar:financeiro": "tsx scripts/verificar-financeiro.ts",
     "verificar:resultado": "tsx scripts/verificar-resultado.ts",
+    "verificar:acertos": "tsx scripts/verificar-acertos.ts",
     "verificar:auth": "tsx scripts/verificar-auth.ts",
     "verificar:navegador": "tsx scripts/verificar-navegador.ts",
     "verificar:mobile": "tsx scripts/verificar-mobile.ts"

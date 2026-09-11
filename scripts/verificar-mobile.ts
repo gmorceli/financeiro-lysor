@@ -63,6 +63,8 @@ async function main() {
     },
   })
   const viagem = await prisma.viagem.findFirstOrThrow({ orderBy: { criadoEm: 'desc' } })
+  const motorista = await prisma.motorista.findFirstOrThrow({ where: { ativo: true } })
+  const agregado = await prisma.proprietario.findFirstOrThrow({ where: { ativo: true } })
 
   const ROTAS = [
     '/', '/viagens', '/viagens/nova', `/viagens/${viagem.id}`,
@@ -70,6 +72,7 @@ async function main() {
     '/custos', '/custos/abastecimentos/novo', '/custos/manutencoes/novo',
     `/viagens/${viagem.id}/despesas/novo`,
     '/financeiro', '/financeiro/pagar', '/financeiro/receber',
+    '/acertos', `/acertos/motorista/${motorista.id}`, `/acertos/agregado/${agregado.id}`,
     '/relatorios', '/relatorios/fretes',
     '/cadastros/veiculos', '/cadastros/veiculos/novo', '/cadastros/motoristas/novo',
     '/cadastros/clientes/novo', '/cadastros/agregados/novo', '/cadastros/fornecedores/novo',

@@ -406,3 +406,21 @@ export const redefinirSenhaSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type UsuarioInput = z.infer<typeof usuarioSchema>
+
+// ---------------------------------------------------------------- Acertos
+
+export const acertoMotoristaSchema = z.object({
+  motoristaId: z.string().trim().min(1),
+  inicio: dataObrigatoria,
+  fim: dataObrigatoria,
+  dataPagamento: dataObrigatoria,
+  adiantamentos: decimalOpcional,
+  descontos: decimalOpcional,
+  observacoes: textoOpcional,
+})
+
+export const acertoAgregadoSchema = z.object({
+  proprietarioId: z.string().trim().min(1),
+  dataPagamento: dataObrigatoria,
+  observacoes: textoOpcional,
+})
