@@ -65,11 +65,16 @@ o caminho é a tela.
 
 ### Deploy
 
-O build de produção roda as migrations e prepara a instalação antes de compilar:
+O **start** de produção roda as migrations e prepara a instalação antes de subir:
 
 ```
-prisma migrate deploy && tsx scripts/preparar-producao.ts && next build
+prisma migrate deploy && tsx scripts/preparar-producao.ts && next start
 ```
+
+No start, e não no build, porque a rede privada do Railway só existe em runtime
+— migration no build não alcançaria o banco, e mandá-la pelo endereço público
+faria a senha do banco atravessar a internet em texto claro. Por isso `prisma` e
+`tsx` são dependências de produção, não de desenvolvimento: o start usa os dois.
 
 É o único momento do deploy com acesso ao banco — o `npm run usuario` precisa de
 um terminal, e no deploy não existe um. `preparar-producao` cria a empresa,

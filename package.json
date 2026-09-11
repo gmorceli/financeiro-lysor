@@ -5,8 +5,8 @@
   "description": "Sistema de gest\u00e3o financeira e operacional da Lysor Transportes",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && tsx scripts/preparar-producao.ts && next build",
-    "start": "next start",
+    "build": "next build",
+    "start": "prisma migrate deploy && tsx scripts/preparar-producao.ts && next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
@@ -36,18 +36,18 @@
     "lucide-react": "^1.44.0",
     "next": "^15.1.0",
     "postcss": "^8.5.28",
+    "prisma": "^6.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "prisma": "^6.1.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }
