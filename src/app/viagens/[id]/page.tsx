@@ -1,0 +1,320 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import { calcularComissaoMotorista } from '@/lib/calculos'
+import { formatarData, formatarMoeda, formatarNumero, rota } from '@/lib/utils'
+import {
+  Badge,
+  Button,
+  CabecalhoPagina,
+  Card,
+  EstadoVazio,
+  Tabela,
+  Td,
+  Th,
+} from '@/components/ui'
+import { FecharViagem } from '../fechar-viagem'
+
+export const dynamic = 'force-dynamic'
+
+const ROTULO_STATUS = {
+  PLANEJADA: 'Planejada',
+  EM_ANDAMENTO: 'Em andamento',
+  AGUARDANDO_ACERTO: 'Aguardando acerto',
+  FECHADA: 'Fechada',
+} as const
+
+function Dado({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-texto-suave">{rotulo}</dt>
+      <dd className="mt-0.5 text-sm text-texto">{valor}</dd>
+    </div>
+  )
+}
+
+export default async function DetalheViagem({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const viagem = await prisma.viagem.findUnique({
+    where: { id },
+    include: {
+      veiculo: { select: { apelido: true } },
+      motorista: {
+        select: { nome: true, percentualComissao: true, baseComissao: true },
+      },
+      fretes: {
+        include: { cliente: { select: { razaoSocial: true, nomeFantasia: true } } },
+        orderBy: { dataEmissao: 'asc' },
+      },
+      lancamentos: {
+        where: { tipo: 'DESPESA' },
+        include: { categoria: { select: { nome: true } } },
+        orderBy: { dataCompetencia: 'asc' },
+      },
+      abastecimentos: { select: { litros: true } },
+    },
+  })
+
+  if (!viagem) notFound()
+
+  const receita = viagem.fretes.reduce((soma, f) => soma + Number(f.valorFreteReal), 0)
+  const receitaCte = viagem.fretes.reduce((soma, f) => soma + Number(f.valorCte), 0)
+  const comissao = viagem.fretes.reduce(
+    (soma, f) =>
+      soma +
+      calcularComissaoMotorista(
+        Number(f.valorFreteReal),
+        Number(f.valorCte),
+        Number(viagem.motorista.percentualComissao),
+        viagem.motorista.baseComissao,
+      ),
+    0,
+  )
+  const kmRodado = viagem.kmFinal != null ? viagem.kmFinal - viagem.kmInicial : null
+  const aberta = viagem.status === 'EM_ANDAMENTO' || viagem.status === 'PLANEJADA'
+
+  // Custos diretos: o que foi apropriado a esta viagem. A comissão do motorista
+  // ainda não é um título — ela nasce no acerto — mas já entra na conta para o
+  // operador não ver uma margem inflada.
+  const custosLancados = viagem.lancamentos.reduce((soma, l) => soma + Number(l.valor), 0)
+  const custoDireto = custosLancados + comissao
+  const margem = receita - custoDireto
+  const litros = viagem.abastecimentos.reduce((soma, a) => soma + Number(a.litros), 0)
+  const consumoViagem = kmRodado && litros > 0 ? kmRodado / litros : null
+
+  return (
+    <>
+      <CabecalhoPagina
+        titulo={`Viagem ${viagem.numero}`}
+        descricao={`${viagem.veiculo.apelido} · ${viagem.origem} → ${viagem.destino}`}
+        acao={<Badge tom={aberta ? 'alerta' : 'positivo'}>{ROTULO_STATUS[viagem.status]}</Badge>}
+      />
+
+      <Card className="mb-4 p-4">
+        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Dado rotulo="Motorista" valor={viagem.motorista.nome} />
+          <Dado rotulo="Saída" valor={formatarData(viagem.dataSaida)} />
+          <Dado rotulo="Chegada" valor={formatarData(viagem.dataChegada)} />
+          <Dado
+            rotulo="Km rodado"
+            valor={kmRodado == null ? '—' : `${formatarNumero(kmRodado)} km`}
+          />
+          {viagem.kmVazio != null && (
+            <Dado
+              rotulo="Km vazio"
+              valor={
+                <>
+                  {formatarNumero(viagem.kmVazio)} km
+                  {kmRodado ? (
+                    <span className="text-texto-suave">
+                      {' '}
+                      ({Math.round((viagem.kmVazio / kmRodado) * 100)}%)
+                    </span>
+                  ) : null}
+                </>
+              }
+            />
+          )}
+          {viagem.kmImprodutivo != null && (
+            <Dado
+              rotulo="Km a mais"
+              valor={
+                <span className="text-alerta">
+                  {formatarNumero(viagem.kmImprodutivo)} km
+                </span>
+              }
+            />
+          )}
+        </dl>
+        {viagem.motivoKmImprodutivo && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-alerta">
+            Km rodado a mais: {viagem.motivoKmImprodutivo}
+          </p>
+        )}
+      </Card>
+
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-borda px-4 py-3">
+          <h2 className="text-sm font-semibold text-texto">Fretes desta viagem</h2>
+          {aberta && (
+            <Link href={rota(`/viagens/${viagem.id}/fretes/novo`)}>
+              <Button variante="secundario">Lançar frete</Button>
+            </Link>
+          )}
+        </div>
+
+        {viagem.fretes.length === 0 ? (
+          <EstadoVazio
+            titulo="Nenhum frete lançado"
+            descricao="Lance o CT-e desta viagem. É de onde sai a receita e a comissão do motorista."
+            acao={
+              aberta ? (
+                <Link href={rota(`/viagens/${viagem.id}/fretes/novo`)}>
+                  <Button>Lançar frete</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <Tabela>
+            <thead>
+              <tr>
+                <Th>CT-e</Th>
+                <Th>Cliente</Th>
+                <Th>Rota</Th>
+                <Th className="text-right">Valor do CT-e</Th>
+                <Th className="text-right">Valor real</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {viagem.fretes.map((frete) => {
+                const divergente = Number(frete.valorFreteReal) !== Number(frete.valorCte)
+                return (
+                  <tr key={frete.id} className="hover:bg-fundo">
+                    <Td className="tabular-nums text-texto-suave">
+                      {frete.numeroCte ?? '—'}
+                    </Td>
+                    <Td className="text-texto">
+                      {frete.cliente.nomeFantasia || frete.cliente.razaoSocial}
+                    </Td>
+                    <Td className="text-texto-suave">
+                      {frete.origem} → {frete.destino}
+                    </Td>
+                    <Td className="text-right tabular-nums text-texto-suave">
+                      {formatarMoeda(frete.valorCte)}
+                    </Td>
+                    <Td className="text-right tabular-nums font-medium text-texto">
+                      {formatarMoeda(frete.valorFreteReal)}
+                      {divergente && (
+                        <span className="ml-1 text-xs font-normal text-alerta">
+                          ≠ CT-e
+                        </span>
+                      )}
+                    </Td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </Tabela>
+        )}
+
+        {viagem.fretes.length > 0 && (
+          <div className="grid gap-3 border-t border-borda px-4 py-3 sm:grid-cols-3">
+            <Dado rotulo="Receita (real)" valor={formatarMoeda(receita)} />
+            <Dado rotulo="Somatório dos CT-e" valor={formatarMoeda(receitaCte)} />
+            <Dado
+              rotulo={`Comissão do motorista (${Number(viagem.motorista.percentualComissao)}%)`}
+              valor={formatarMoeda(comissao)}
+            />
+          </div>
+        )}
+      </Card>
+
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-borda px-4 py-3">
+          <h2 className="text-sm font-semibold text-texto">Custos desta viagem</h2>
+          {aberta && (
+            <div className="flex flex-wrap gap-2">
+              <Link href={rota(`/viagens/${viagem.id}/abastecimentos/novo`)}>
+                <Button variante="secundario">Abastecimento</Button>
+              </Link>
+              <Link href={rota(`/viagens/${viagem.id}/despesas/novo`)}>
+                <Button variante="secundario">Despesa</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {viagem.lancamentos.length === 0 ? (
+          <EstadoVazio
+            titulo="Nenhum custo lançado"
+            descricao="Diesel, pedágio e despesa de estrada entram aqui e viram conta a pagar automaticamente."
+            acao={
+              aberta ? (
+                <Link href={rota(`/viagens/${viagem.id}/abastecimentos/novo`)}>
+                  <Button>Lançar abastecimento</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <Tabela>
+            <thead>
+              <tr>
+                <Th>Data</Th>
+                <Th>Tipo</Th>
+                <Th>Descrição</Th>
+                <Th className="text-right">Valor</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {viagem.lancamentos.map((lancamento) => (
+                <tr key={lancamento.id} className="hover:bg-fundo">
+                  <Td className="tabular-nums text-texto-suave">
+                    {formatarData(lancamento.dataCompetencia)}
+                  </Td>
+                  <Td className="text-texto-suave">{lancamento.categoria.nome}</Td>
+                  <Td className="text-texto">{lancamento.descricao}</Td>
+                  <Td className="text-right tabular-nums font-medium text-texto">
+                    {formatarMoeda(lancamento.valor)}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabela>
+        )}
+      </Card>
+
+      {viagem.fretes.length > 0 && (
+        <Card className="mb-4 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-texto">Resultado da viagem</h2>
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-texto-suave">Receita</dt>
+              <dd className="tabular-nums text-texto">{formatarMoeda(receita)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-texto-suave">Custos lançados</dt>
+              <dd className="tabular-nums text-texto">− {formatarMoeda(custosLancados)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-texto-suave">Comissão do motorista</dt>
+              <dd className="tabular-nums text-texto">− {formatarMoeda(comissao)}</dd>
+            </div>
+            <div className="flex justify-between gap-4 border-t border-borda pt-1.5 font-medium">
+              <dt className="text-texto">Margem de contribuição</dt>
+              <dd
+                className={
+                  margem >= 0 ? 'tabular-nums text-primaria' : 'tabular-nums text-erro'
+                }
+              >
+                {formatarMoeda(margem)}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-xs text-texto-suave">
+            Ainda sem o custo do caminhão (manutenção, seguro, parcela) nem o custo fixo da
+            empresa — esses entram no relatório de resultado do mês.
+            {kmRodado ? ` Custo de ${formatarMoeda(custoDireto / kmRodado)} por km rodado.` : ''}
+            {consumoViagem ? ` Consumo de ${consumoViagem.toFixed(2).replace('.', ',')} km/l.` : ''}
+          </p>
+        </Card>
+      )}
+
+      {aberta ? (
+        <Card className="p-4">
+          <h2 className="mb-4 text-sm font-semibold text-texto">Fechar viagem</h2>
+          <FecharViagem viagemId={viagem.id} kmInicial={viagem.kmInicial} />
+        </Card>
+      ) : (
+        <Link href="/viagens">
+          <Button variante="secundario">Voltar para viagens</Button>
+        </Link>
+      )}
+    </>
+  )
+}

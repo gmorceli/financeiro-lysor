@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-fundo: #f7f7f5;
+  --color-superficie: #ffffff;
+  --color-borda: #e4e4e0;
+  --color-texto: #1c1c1a;
+  --color-texto-suave: #6b6b66;
+  --color-primaria: #1f6f4a;
+  --color-primaria-clara: #e8f2ec;
+  --color-alerta: #b45309;
+  --color-erro: #b91c1c;
+}
+
+html,
+body {
+  background: var(--color-fundo);
+  color: var(--color-texto);
+}
+
+/*
+ * Alvos de toque confortáveis: a operação usa celular no pátio e na estrada.
+ *
+ * Esta regra cobre botão e campo. Ela NÃO cobre link comum — e era ali que
+ * estava o problema de verdade: link dentro de célula de tabela tem a altura do
+ * texto, 16px, e é assim que a pessoa abre um caminhão ou uma viagem. Esses
+ * casos são resolvidos um a um (`LINK_TABELA`, a navegação, os filtros), porque
+ * cada um precisa comer a margem do que o contém em vez de esticar a linha.
+ *
+ * `npm run verificar:mobile` mede os dois tipos e falha abaixo de 40px.
+ */
+@media (pointer: coarse) {
+  button,
+  a[role='button'],
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}

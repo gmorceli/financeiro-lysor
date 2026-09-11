@@ -1,0 +1,764 @@
+// Sistema de gestão da Lysor Transportes
+// Modelo derivado de docs/03-modelo-de-dados.md, docs/08-analise-do-levantamento.md
+// e das confirmações da cliente em docs/10-respostas-confirmacoes-2026-09-10.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum PerfilUsuario {
+  ADMIN
+  FINANCEIRO
+  OPERACAO
+  MOTORISTA
+}
+
+/// CAVALO e TRUCK rodam e acumulam odômetro. CARRETA é rebocada e tem custo
+/// próprio (ANTT, licenciamento, pneus), mas não tem odômetro.
+enum TipoVeiculo {
+  CAVALO
+  TRUCK
+  CARRETA
+}
+
+enum TipoPosse {
+  PROPRIO
+  AGREGADO
+}
+
+enum StatusVeiculo {
+  ATIVO
+  MANUTENCAO
+  INATIVO
+  VENDIDO
+}
+
+enum VinculoMotorista {
+  CLT
+  AUTONOMO
+  AGREGADO
+}
+
+enum TipoPessoa {
+  PF
+  PJ
+}
+
+enum StatusViagem {
+  PLANEJADA
+  EM_ANDAMENTO
+  AGUARDANDO_ACERTO
+  FECHADA
+}
+
+/// FROTA_PROPRIA: receita é o frete, custos diretos são da Lysor.
+/// AGREGADO: receita é a comissão + seguro cobrados do agregado; custo ~zero.
+enum ModalidadeFrete {
+  FROTA_PROPRIA
+  AGREGADO
+}
+
+/// Como o dinheiro do frete de agregado circula (confirmado pela cliente:
+/// os dois casos acontecem).
+/// INTERMEDIADO: o cliente paga a Lysor, que repassa ao agregado já
+///   descontando a comissão. Gera receber do cliente + pagar ao agregado.
+/// DIRETO: o agregado recebe do cliente e repassa só a comissão à Lysor.
+///   Gera apenas um receber contra o agregado.
+enum FluxoFinanceiroAgregado {
+  INTERMEDIADO
+  DIRETO
+}
+
+enum StatusFrete {
+  ABERTO
+  ENTREGUE
+  FATURADO
+  CANCELADO
+}
+
+enum TipoLancamento {
+  RECEITA
+  DESPESA
+}
+
+/// Camada do lançamento na cascata do DRE gerencial.
+enum NivelCusto {
+  DIRETO_VIAGEM
+  VEICULO
+  OVERHEAD
+}
+
+enum StatusLancamento {
+  ABERTO
+  PARCIAL
+  LIQUIDADO
+  CANCELADO
+}
+
+/// DATA: vence na data marcada.
+/// AO_RECEBER: nasce quando o título de origem é baixado — é assim que o
+/// acerto do agregado funciona hoje ("quando o cliente paga").
+enum GatilhoVencimento {
+  DATA
+  AO_RECEBER
+}
+
+enum FormaPagamento {
+  DINHEIRO
+  PIX
+  CHEQUE
+  BOLETO
+  CARTAO
+  TRANSFERENCIA
+}
+
+enum TipoManutencao {
+  PREVENTIVA
+  CORRETIVA
+  PNEU
+  REVISAO
+}
+
+enum OrigemDado {
+  MANUAL
+  IMPORTADO
+}
+
+enum TipoAcerto {
+  MOTORISTA
+  AGREGADO
+}
+
+enum ModeloRemuneracao {
+  FIXO_MENSAL
+  COMISSAO
+  HIBRIDO
+}
+
+/// Base sobre a qual a comissão do motorista incide. FRETE_REAL é o caso da
+/// Lysor: parte dos CT-e sai pelo mínimo e a comissão segue o valor combinado.
+enum BaseComissao {
+  FRETE_REAL
+  VALOR_CTE
+}
+
+// ---------------------------------------------------------------------------
+// Cadastros
+// ---------------------------------------------------------------------------
+
+/// Sistema single-tenant: uma linha só. Guarda dados de cabeçalho de relatório
+/// e os parâmetros de rateio, não serve para isolamento de dados.
+model Empresa {
+  id           String   @id @default(cuid())
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String   @unique
+  timezone     String   @default("America/Sao_Paulo")
+  dataCorte    DateTime @db.Date
+  configRateio Json     @default("{}")
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@map("empresa")
+}
+
+model Usuario {
+  id          String        @id @default(cuid())
+  nome        String
+  email       String        @unique
+  senhaHash   String
+  perfil      PerfilUsuario
+  motoristaId String?       @unique
+  ativo       Boolean       @default(true)
+
+  /// Senha criada por um administrador só serve para o primeiro login: enquanto
+  /// esta flag estiver de pé, toda navegação cai na tela de troca de senha.
+  trocarSenha     Boolean   @default(true)
+  senhaDefinidaEm DateTime  @default(now())
+  ultimoAcessoEm  DateTime?
+
+  /// Freio de tentativa em massa. Contador zera no acerto; ao estourar o limite
+  /// a conta fica presa até `bloqueadoAte`.
+  tentativasFalhas Int       @default(0)
+  bloqueadoAte     DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  motorista Motorista? @relation(fields: [motoristaId], references: [id])
+  sessoes   Sessao[]
+
+  @@map("usuario")
+}
+
+/// Sessão de login. O cookie do navegador carrega o token em claro; aqui fica
+/// só o SHA-256 dele. Vazamento do banco não vira sessão ativa — é a mesma
+/// razão pela qual senha não se guarda legível.
+///
+/// Sessão no banco em vez de JWT porque a revogação tem que ser imediata: ao
+/// trocar a senha ou desativar o usuário, as sessões dele somem no mesmo
+/// instante. Com token assinado auto-contido, só o vencimento derruba.
+model Sessao {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  usuarioId String
+  expiraEm  DateTime
+  criadoEm  DateTime @default(now())
+  ip        String?
+  navegador String?
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEm])
+  @@map("sessao")
+}
+
+model Cliente {
+  id                 String   @id @default(cuid())
+  razaoSocial        String
+  nomeFantasia       String?
+  cnpj               String?  @unique
+  contato            String?
+  telefone           String?
+  email              String?
+  prazoPagamentoDias Int      @default(0)
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now())
+  atualizadoEm       DateTime @updatedAt
+
+  fretes      Frete[]
+  faturas     Fatura[]
+  lancamentos Lancamento[]
+
+  @@index([ativo])
+  @@map("cliente")
+}
+
+/// Dono do caminhão agregado. Na Lysor o agregado PAGA a transportadora, por
+/// isso o campo é regra de cobrança e não de remuneração.
+model Proprietario {
+  id             String     @id @default(cuid())
+  nome           String
+  cpfCnpj        String     @unique
+  tipoPessoa     TipoPessoa
+  contato        String?
+  telefone       String?
+  dadosBancarios Json?
+  regraCobranca  Json
+  ativo          Boolean    @default(true)
+  criadoEm       DateTime   @default(now())
+  atualizadoEm   DateTime   @updatedAt
+
+  veiculos    Veiculo[]
+  fretes      Frete[]
+  lancamentos Lancamento[]
+  acertos     Acerto[]
+
+  @@map("proprietario")
+}
+
+/// O apelido é o identificador visível em toda a interface ("FH Vermelha",
+/// "Carreta Viloças"). Nas folhas da cliente não aparece uma única placa.
+model Veiculo {
+  id                  String        @id @default(cuid())
+  apelido             String        @unique
+  placa               String        @unique
+  tipo                TipoVeiculo
+  tipoPosse           TipoPosse     @default(PROPRIO)
+  proprietarioId      String?
+  marca               String?
+  modelo              String?
+  ano                 Int?
+  eixos               Int?
+  tipoCarroceria      String?
+  capacidadeKg        Int?
+  capacidadeCabecas   Int?
+  /// Só se aplica a CAVALO e TRUCK. Validado como monotônico crescente.
+  odometroAtual       Int?
+  isentoIpva          Boolean       @default(false)
+  isentoLicenciamento Boolean       @default(false)
+  dataAquisicao       DateTime?     @db.Date
+  valorAquisicao      Decimal?      @db.Decimal(14, 2)
+  status              StatusVeiculo @default(ATIVO)
+  observacoes         String?
+  criadoEm            DateTime      @default(now())
+  atualizadoEm        DateTime      @updatedAt
+
+  proprietario         Proprietario?   @relation(fields: [proprietarioId], references: [id])
+  viagens              Viagem[]
+  abastecimentos       Abastecimento[]
+  manutencoes          Manutencao[]
+  lancamentos          Lancamento[]
+  recorrencias         Recorrencia[]
+  conjuntosComoCavalo  Conjunto[]      @relation("ConjuntoCavalo")
+  conjuntosComoCarreta Conjunto[]      @relation("ConjuntoCarreta")
+  motoristasPadrao     Motorista[]
+
+  @@index([tipo, status])
+  @@map("veiculo")
+}
+
+/// Cavalo + carreta com vigência. A carreta é fixa por cavalo, mas "às vezes
+/// acontece de trocar" — a vigência faz o custo seguir o conjunto certo.
+model Conjunto {
+  id        String    @id @default(cuid())
+  cavaloId  String
+  carretaId String
+  inicio    DateTime  @db.Date
+  fim       DateTime? @db.Date
+  criadoEm  DateTime  @default(now())
+
+  cavalo  Veiculo @relation("ConjuntoCavalo", fields: [cavaloId], references: [id])
+  carreta Veiculo @relation("ConjuntoCarreta", fields: [carretaId], references: [id])
+
+  @@index([cavaloId, inicio])
+  @@index([carretaId, inicio])
+  @@map("conjunto")
+}
+
+model Motorista {
+  id                 String            @id @default(cuid())
+  nome               String
+  cpf                String            @unique
+  cnh                String?
+  cnhCategoria       String?
+  cnhValidade        DateTime?         @db.Date
+  telefone           String?
+  vinculo            VinculoMotorista
+  modeloRemuneracao  ModeloRemuneracao
+  salarioFixo        Decimal           @default(0) @db.Decimal(14, 2)
+  percentualComissao Decimal           @default(0) @db.Decimal(7, 4)
+  baseComissao       BaseComissao      @default(FRETE_REAL)
+  valorDiaria        Decimal           @default(0) @db.Decimal(14, 2)
+  veiculoPadraoId    String?
+  ativo              Boolean           @default(true)
+  criadoEm           DateTime          @default(now())
+  atualizadoEm       DateTime          @updatedAt
+
+  veiculoPadrao  Veiculo?        @relation(fields: [veiculoPadraoId], references: [id])
+  usuario        Usuario?
+  viagens        Viagem[]
+  abastecimentos Abastecimento[]
+  lancamentos    Lancamento[]
+  acertos        Acerto[]
+
+  @@map("motorista")
+}
+
+model Fornecedor {
+  id           String      @id @default(cuid())
+  nome         String
+  cpfCnpj      String?     @unique
+  tipoPessoa   TipoPessoa?
+  categoria    String?
+  telefone     String?
+  ativo        Boolean     @default(true)
+  criadoEm     DateTime    @default(now())
+  atualizadoEm DateTime    @updatedAt
+
+  abastecimentos Abastecimento[]
+  manutencoes    Manutencao[]
+  lancamentos    Lancamento[]
+
+  @@map("fornecedor")
+}
+
+model ContaBancaria {
+  id           String   @id @default(cuid())
+  nome         String
+  banco        String?
+  agencia      String?
+  conta        String?
+  saldoInicial Decimal  @default(0) @db.Decimal(14, 2)
+  dataSaldo    DateTime @db.Date
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+
+  baixas Baixa[]
+
+  @@map("conta_bancaria")
+}
+
+// ---------------------------------------------------------------------------
+// Operação
+// ---------------------------------------------------------------------------
+
+/// Unidade de apropriação de custo. Diesel, pedágio e despesa de estrada são
+/// da viagem, não do frete.
+model Viagem {
+  id                  String       @id @default(cuid())
+  numero              Int          @unique @default(autoincrement())
+  veiculoId           String
+  motoristaId         String
+  dataSaida           DateTime     @db.Date
+  dataChegada         DateTime?    @db.Date
+  kmInicial           Int
+  kmFinal             Int?
+  kmCarregado         Int?
+  /// Nesta operação o retorno vazio é a regra, não a exceção.
+  kmVazio             Int?
+  /// Km rodado a mais por erro de terceiro (endereço errado do cliente).
+  kmImprodutivo       Int?
+  motivoKmImprodutivo String?
+  origem              String
+  destino             String
+  status              StatusViagem @default(PLANEJADA)
+  observacoes         String?
+  criadoEm            DateTime     @default(now())
+  atualizadoEm        DateTime     @updatedAt
+
+  veiculo        Veiculo         @relation(fields: [veiculoId], references: [id])
+  motorista      Motorista       @relation(fields: [motoristaId], references: [id])
+  fretes         Frete[]
+  abastecimentos Abastecimento[]
+  lancamentos    Lancamento[]
+  acerto         Acerto?
+
+  @@index([veiculoId, dataSaida])
+  @@index([status])
+  @@map("viagem")
+}
+
+/// Unidade de receita: 1 CT-e ou 1 ordem de serviço.
+model Frete {
+  id              String                   @id @default(cuid())
+  viagemId        String?
+  clienteId       String
+  modalidade      ModalidadeFrete          @default(FROTA_PROPRIA)
+  proprietarioId  String?
+  /// Só se aplica a modalidade AGREGADO.
+  fluxoFinanceiro FluxoFinanceiroAgregado?
+
+  numeroCte String?
+  serie     String?
+  chaveCte  String? @unique
+
+  origem  String
+  destino String
+  produto String?
+  pesoKg  Int?
+  cabecas Int?
+
+  /// Valor fiscal, vem do XML do CT-e.
+  valorCte              Decimal  @db.Decimal(14, 2)
+  /// Valor gerencial, confirmado na tela. Base da comissão do motorista e do
+  /// cálculo de lucro — parte dos CT-e é emitida pelo mínimo.
+  valorFreteReal        Decimal  @db.Decimal(14, 2)
+  /// Valor da carga (infCarga/vCarga do XML). Base do seguro do agregado.
+  valorCargaNfe         Decimal? @db.Decimal(14, 2)
+  numeroNfe             String?
+  valorPedagioDestacado Decimal? @db.Decimal(14, 2)
+  valorIcms             Decimal? @db.Decimal(14, 2)
+  outrasReceitas        Decimal? @db.Decimal(14, 2)
+
+  /// Receita da Lysor quando modalidade = AGREGADO.
+  valorComissaoAgregado Decimal? @db.Decimal(14, 2)
+  valorSeguroAgregado   Decimal? @db.Decimal(14, 2)
+
+  /// Aponta o CT-e original quando este frete é um complemento.
+  cteComplementoDeId String?
+
+  dataEmissao DateTime  @db.Date
+  dataColeta  DateTime? @db.Date
+  dataEntrega DateTime? @db.Date
+
+  faturaId     String?
+  status       StatusFrete @default(ABERTO)
+  observacoes  String?
+  origemDado   OrigemDado  @default(MANUAL)
+  criadoEm     DateTime    @default(now())
+  atualizadoEm DateTime    @updatedAt
+
+  viagem           Viagem?       @relation(fields: [viagemId], references: [id])
+  cliente          Cliente       @relation(fields: [clienteId], references: [id])
+  proprietario     Proprietario? @relation(fields: [proprietarioId], references: [id])
+  fatura           Fatura?       @relation(fields: [faturaId], references: [id])
+  cteComplementoDe Frete?        @relation("ComplementoCte", fields: [cteComplementoDeId], references: [id])
+  complementos     Frete[]       @relation("ComplementoCte")
+  lancamentos      Lancamento[]
+
+  @@index([clienteId, dataEmissao])
+  @@index([modalidade, dataEmissao])
+  @@index([status])
+  @@map("frete")
+}
+
+model Abastecimento {
+  id           String     @id @default(cuid())
+  veiculoId    String
+  viagemId     String?
+  motoristaId  String?
+  fornecedorId String?
+  data         DateTime   @db.Date
+  litros       Decimal    @db.Decimal(10, 3)
+  valorLitro   Decimal    @db.Decimal(10, 4)
+  valorTotal   Decimal    @db.Decimal(14, 2)
+  odometro     Int
+  /// km/l só fecha entre dois abastecimentos de tanque cheio.
+  tanqueCheio  Boolean    @default(true)
+  origemDado   OrigemDado @default(MANUAL)
+  lancamentoId String?    @unique
+  criadoEm     DateTime   @default(now())
+  atualizadoEm DateTime   @updatedAt
+
+  veiculo    Veiculo     @relation(fields: [veiculoId], references: [id])
+  viagem     Viagem?     @relation(fields: [viagemId], references: [id])
+  motorista  Motorista?  @relation(fields: [motoristaId], references: [id])
+  fornecedor Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  lancamento Lancamento? @relation(fields: [lancamentoId], references: [id])
+
+  @@index([veiculoId, data])
+  @@map("abastecimento")
+}
+
+model Manutencao {
+  id           String         @id @default(cuid())
+  veiculoId    String
+  fornecedorId String?
+  data         DateTime       @db.Date
+  odometro     Int?
+  tipo         TipoManutencao
+  descricao    String
+  valorPecas   Decimal        @default(0) @db.Decimal(14, 2)
+  valorServico Decimal        @default(0) @db.Decimal(14, 2)
+  lancamentoId String?        @unique
+  criadoEm     DateTime       @default(now())
+  atualizadoEm DateTime       @updatedAt
+
+  veiculo    Veiculo     @relation(fields: [veiculoId], references: [id])
+  fornecedor Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  lancamento Lancamento? @relation(fields: [lancamentoId], references: [id])
+
+  @@index([veiculoId, data])
+  @@map("manutencao")
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro
+// ---------------------------------------------------------------------------
+
+model Categoria {
+  id             String         @id @default(cuid())
+  nome           String         @unique
+  tipo           TipoLancamento
+  /// Define em que camada da cascata do DRE o lançamento entra.
+  nivelCusto     NivelCusto
+  categoriaPaiId String?
+  sistema        Boolean        @default(false)
+  ativo          Boolean        @default(true)
+
+  categoriaPai  Categoria?    @relation("CategoriaHierarquia", fields: [categoriaPaiId], references: [id])
+  subcategorias Categoria[]   @relation("CategoriaHierarquia")
+  lancamentos   Lancamento[]
+  recorrencias  Recorrencia[]
+
+  @@map("categoria")
+}
+
+/// O título financeiro único: despesa e conta a pagar são o mesmo registro.
+/// Competência alimenta o DRE, vencimento alimenta o contas a pagar/receber e
+/// pagamento alimenta o fluxo de caixa.
+model Lancamento {
+  id          String         @id @default(cuid())
+  tipo        TipoLancamento
+  categoriaId String
+  descricao   String
+  valor       Decimal        @db.Decimal(14, 2)
+  valorPago   Decimal        @default(0) @db.Decimal(14, 2)
+
+  dataCompetencia DateTime  @db.Date
+  dataVencimento  DateTime? @db.Date
+  dataPagamento   DateTime? @db.Date
+
+  /// Vencimento por gatilho: o acerto do agregado nasce quando o título de
+  /// origem é recebido.
+  gatilhoVencimento  GatilhoVencimento @default(DATA)
+  lancamentoOrigemId String?
+
+  // Apropriação na cascata de custo
+  veiculoId String?
+  viagemId  String?
+  freteId   String?
+
+  // Contraparte
+  clienteId      String?
+  fornecedorId   String?
+  motoristaId    String?
+  proprietarioId String?
+
+  formaPagamento FormaPagamento?
+  parcelamentoId String?
+  parcelaNumero  Int?
+  parcelaTotal   Int?
+
+  recorrenciaId String?
+  status        StatusLancamento @default(ABERTO)
+  /// Lançamento pago é imutável: correção se faz por estorno.
+  estornoDeId   String?          @unique
+  observacoes   String?
+  criadoPor     String?
+  criadoEm      DateTime         @default(now())
+  atualizadoEm  DateTime         @updatedAt
+
+  categoria              Categoria     @relation(fields: [categoriaId], references: [id])
+  veiculo                Veiculo?      @relation(fields: [veiculoId], references: [id])
+  viagem                 Viagem?       @relation(fields: [viagemId], references: [id])
+  frete                  Frete?        @relation(fields: [freteId], references: [id])
+  cliente                Cliente?      @relation(fields: [clienteId], references: [id])
+  fornecedor             Fornecedor?   @relation(fields: [fornecedorId], references: [id])
+  motorista              Motorista?    @relation(fields: [motoristaId], references: [id])
+  proprietario           Proprietario? @relation(fields: [proprietarioId], references: [id])
+  recorrencia            Recorrencia?  @relation(fields: [recorrenciaId], references: [id])
+  lancamentoOrigem       Lancamento?   @relation("GatilhoRecebimento", fields: [lancamentoOrigemId], references: [id])
+  lancamentosDependentes Lancamento[]  @relation("GatilhoRecebimento")
+  estornoDe              Lancamento?   @relation("Estorno", fields: [estornoDeId], references: [id])
+  estorno                Lancamento?   @relation("Estorno")
+
+  baixas        Baixa[]
+  abastecimento Abastecimento?
+  manutencao    Manutencao?
+  fatura        Fatura?
+  acerto        Acerto?
+
+  @@index([tipo, dataVencimento])
+  @@index([dataCompetencia])
+  @@index([status, dataVencimento])
+  @@index([veiculoId, dataCompetencia])
+  @@index([parcelamentoId])
+  @@map("lancamento")
+}
+
+model Baixa {
+  id              String   @id @default(cuid())
+  lancamentoId    String
+  data            DateTime @db.Date
+  valor           Decimal  @db.Decimal(14, 2)
+  contaBancariaId String?
+  observacoes     String?
+  criadoPor       String?
+  criadoEm        DateTime @default(now())
+
+  lancamento    Lancamento     @relation(fields: [lancamentoId], references: [id])
+  contaBancaria ContaBancaria? @relation(fields: [contaBancariaId], references: [id])
+
+  @@index([lancamentoId])
+  @@index([data])
+  @@map("baixa")
+}
+
+/// Agrupamento eventual de CT-e para cobrança ("às vezes passa 15 dias e
+/// juntamos tudo").
+model Fatura {
+  id             String   @id @default(cuid())
+  clienteId      String
+  numero         Int      @unique @default(autoincrement())
+  periodoInicio  DateTime @db.Date
+  periodoFim     DateTime @db.Date
+  valorTotal     Decimal  @db.Decimal(14, 2)
+  dataEmissao    DateTime @db.Date
+  dataVencimento DateTime @db.Date
+  lancamentoId   String?  @unique
+  criadoEm       DateTime @default(now())
+
+  cliente    Cliente     @relation(fields: [clienteId], references: [id])
+  lancamento Lancamento? @relation(fields: [lancamentoId], references: [id])
+  fretes     Frete[]
+
+  @@index([clienteId, periodoInicio])
+  @@map("fatura")
+}
+
+/// Fechamento da viagem (motorista) ou do período (agregado).
+model Acerto {
+  id                   String     @id @default(cuid())
+  tipo                 TipoAcerto
+  viagemId             String?    @unique
+  motoristaId          String?
+  proprietarioId       String?
+  valorBruto           Decimal    @db.Decimal(14, 2)
+  adiantamentos        Decimal    @default(0) @db.Decimal(14, 2)
+  descontos            Decimal    @default(0) @db.Decimal(14, 2)
+  despesasReembolsadas Decimal    @default(0) @db.Decimal(14, 2)
+  valorLiquido         Decimal    @db.Decimal(14, 2)
+  lancamentoId         String?    @unique
+  fechadoEm            DateTime?
+  fechadoPor           String?
+  criadoEm             DateTime   @default(now())
+
+  viagem       Viagem?       @relation(fields: [viagemId], references: [id])
+  motorista    Motorista?    @relation(fields: [motoristaId], references: [id])
+  proprietario Proprietario? @relation(fields: [proprietarioId], references: [id])
+  lancamento   Lancamento?   @relation(fields: [lancamentoId], references: [id])
+
+  @@map("acerto")
+}
+
+/// Gera lançamento mensal: seguro, IPVA, licenciamento, ANTT, rastreador,
+/// parcela de financiamento, Starlink, contador, sistema.
+model Recorrencia {
+  id            String    @id @default(cuid())
+  descricao     String
+  categoriaId   String
+  veiculoId     String?
+  valor         Decimal   @db.Decimal(14, 2)
+  diaVencimento Int
+  inicio        DateTime  @db.Date
+  fim           DateTime? @db.Date
+  parcelasTotal Int?
+  ativo         Boolean   @default(true)
+  criadoEm      DateTime  @default(now())
+  atualizadoEm  DateTime  @updatedAt
+
+  categoria   Categoria    @relation(fields: [categoriaId], references: [id])
+  veiculo     Veiculo?     @relation(fields: [veiculoId], references: [id])
+  lancamentos Lancamento[]
+
+  @@map("recorrencia")
+}
+
+// ---------------------------------------------------------------------------
+// Suporte
+// ---------------------------------------------------------------------------
+
+/// Cupom de abastecimento, NF de manutenção, nota fiscal da carga, comprovante
+/// de pagamento. É o que faz a cliente confiar no número — ela clica e vê.
+model Anexo {
+  id           String   @id @default(cuid())
+  entidade     String
+  entidadeId   String
+  url          String
+  nomeArquivo  String
+  mime         String?
+  tamanhoBytes Int?
+  enviadoPor   String?
+  enviadoEm    DateTime @default(now())
+
+  @@index([entidade, entidadeId])
+  @@map("anexo")
+}
+
+model Auditoria {
+  id          String   @id @default(cuid())
+  usuarioId   String?
+  entidade    String
+  entidadeId  String
+  acao        String
+  dadosAntes  Json?
+  dadosDepois Json?
+  criadoEm    DateTime @default(now())
+
+  @@index([entidade, entidadeId])
+  @@index([criadoEm])
+  @@map("auditoria")
+}
