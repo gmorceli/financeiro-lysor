@@ -315,3 +315,120 @@ export async function apagarAbastecimento(tx: Tx, id: string): Promise<void> {
   await tx.lancamento.deleteMany({ where: { id: { in: ids } } })
   await tx.abastecimento.delete({ where: { id: atual.id } })
 }
+
+// ------------------------------------------------------------ Despesa avulsa
+
+/**
+ * O filtro que diz o que é uma despesa avulsa.
+ *
+ * Todo custo do sistema é um `Lancamento`, mas quase nenhum é editável por uma
+ * tela genérica: o título de um frete pertence ao frete, o de um abastecimento
+ * ao abastecimento, e as parcelas de uma manutenção à manutenção. Abrir
+ * qualquer um desses na tela de despesa deixaria dois donos para o mesmo
+ * registro — e o segundo a salvar apagaria o trabalho do primeiro.
+ *
+ * O `parcelamentoId: null` é o detalhe fácil de esquecer: só a primeira parcela
+ * de uma manutenção tem a relação `manutencao` preenchida. Da segunda em diante
+ * o vínculo é só o carimbo.
+ */
+export const DESPESA_AVULSA = {
+  tipo: 'DESPESA',
+  freteId: null,
+  parcelamentoId: null,
+  acertoId: null,
+  recorrenciaId: null,
+  abastecimento: { is: null },
+  manutencao: { is: null },
+  acertoGerado: { is: null },
+} satisfies Prisma.LancamentoWhereInput
+
+export type DadosDespesa = {
+  categoriaId: string
+  descricao: string
+  valor: number
+  data: Date
+  dataVencimento?: Date | null
+  viagemId?: string | null
+  veiculoId?: string | null
+  fornecedorId?: string | null
+  formaPagamento: FormaPagamento
+  observacoes?: string | null
+}
+
+/**
+ * Cria ou corrige uma despesa que não é abastecimento nem manutenção.
+ *
+ * Pedágio, chapa, lavagem, seguro, licenciamento, contador. Sem esta tela a
+ * cliente lançava tudo como manutenção — a única porta que o menu Custos
+ * abria — e pedágio, que é custo direto da viagem, ia parar na camada de custo
+ * do caminhão. O resultado não sumia, mas contava a história errada: o caminhão
+ * parecia caro de manter por causa de pedágio.
+ *
+ * O veículo acompanha a viagem quando há uma: é o que permite a despesa cair no
+ * caminhão certo sem a pessoa escolher duas vezes a mesma coisa.
+ */
+export async function gravarDespesa(
+  tx: Tx,
+  entrada: { id?: string; dados: DadosDespesa },
+): Promise<string> {
+  const { dados } = entrada
+
+  const viagem = dados.viagemId
+    ? await tx.viagem.findUnique({
+        where: { id: dados.viagemId },
+        select: { veiculoId: true },
+      })
+    : null
+  if (dados.viagemId && !viagem) throw new Error('Viagem não encontrada.')
+
+  const campos = {
+    tipo: 'DESPESA' as const,
+    categoriaId: dados.categoriaId,
+    descricao: dados.descricao,
+    valor: new Prisma.Decimal(arredondar(dados.valor)),
+    dataCompetencia: dados.data,
+    dataVencimento: dados.dataVencimento ?? dados.data,
+    viagemId: dados.viagemId ?? null,
+    veiculoId: viagem?.veiculoId ?? dados.veiculoId ?? null,
+    fornecedorId: dados.fornecedorId ?? null,
+    formaPagamento: dados.formaPagamento,
+    observacoes: dados.observacoes ?? null,
+  }
+
+  if (!entrada.id) {
+    const criada = await tx.lancamento.create({ data: campos, select: { id: true } })
+    return criada.id
+  }
+
+  // Só edita o que nasceu nesta tela. Um id colado na barra de endereço não
+  // pode virar a porta dos fundos para o título de um frete.
+  const atual = await tx.lancamento.findFirst({
+    where: { id: entrada.id, ...DESPESA_AVULSA },
+    select: { id: true, valorPago: true },
+  })
+  if (!atual) {
+    throw new Error(
+      'Esta despesa não existe ou pertence a um frete, abastecimento ou manutenção — corrija pela tela dele.',
+    )
+  }
+  if (Number(atual.valorPago) > 0) throw new Error(`Esta despesa ${RECUSA_BAIXA}`)
+
+  await tx.lancamento.update({ where: { id: atual.id }, data: campos })
+  return atual.id
+}
+
+/** Apaga uma despesa avulsa, se ninguém a pagou. */
+export async function apagarDespesa(tx: Tx, id: string): Promise<void> {
+  const atual = await tx.lancamento.findFirst({
+    where: { id, ...DESPESA_AVULSA },
+    select: { id: true, valorPago: true },
+  })
+  if (!atual) {
+    throw new Error(
+      'Esta despesa não existe ou pertence a um frete, abastecimento ou manutenção — exclua pela tela dele.',
+    )
+  }
+  if (Number(atual.valorPago) > 0) throw new Error(`Esta despesa ${RECUSA_BAIXA}`)
+
+  await tx.lancamento.delete({ where: { id: atual.id } })
+}

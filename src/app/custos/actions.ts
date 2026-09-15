@@ -3,11 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { abastecimentoSchema, manutencaoSchema } from '@/lib/validacao'
+import { abastecimentoSchema, despesaSchema, manutencaoSchema } from '@/lib/validacao'
 import {
   apagarAbastecimento,
+  apagarDespesa,
   apagarManutencao,
   gravarAbastecimento,
+  gravarDespesa,
   gravarManutencao,
 } from '@/lib/custos'
 import { CATEGORIA, idDaCategoria } from '@/lib/categorias'
@@ -148,6 +150,61 @@ export async function excluirManutencao(id: string): Promise<EstadoFormulario> {
     return traduzirErroPrisma(erro)
   }
   revalidatePath('/custos/manutencoes')
+  revalidatePath('/financeiro')
+  return { ok: true }
+}
+
+/**
+ * Despesa avulsa: pedágio, chapa, lavagem, seguro, licenciamento, contador.
+ *
+ * É a porta que faltava no menu Custos. Sem ela, tudo que não era abastecimento
+ * virava "manutenção" — e pedágio, que é custo direto da viagem, ia parar na
+ * camada de custo do caminhão.
+ */
+export async function salvarDespesa(
+  _estado: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
+  const id = formData.get('id')?.toString() || undefined
+  const validado = validarFormulario(despesaSchema, formData)
+  if (!validado.sucesso) return validado.estado
+
+  const dados = validado.dados
+  try {
+    await prisma.$transaction((tx) =>
+      gravarDespesa(tx, {
+        id,
+        dados: {
+          ...dados,
+          viagemId: dados.viagemId ?? null,
+          veiculoId: dados.veiculoId ?? null,
+          fornecedorId: dados.fornecedorId ?? null,
+          dataVencimento: dados.dataVencimento ?? null,
+          observacoes: dados.observacoes ?? null,
+        },
+      }),
+    )
+  } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
+    return traduzirErroPrisma(erro)
+  }
+
+  revalidatePath('/custos/despesas')
+  revalidatePath('/financeiro')
+  if (dados.viagemId) revalidatePath(`/viagens/${dados.viagemId}`)
+  redirect(rota('/custos/despesas'))
+}
+
+export async function excluirDespesa(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
+  try {
+    await prisma.$transaction((tx) => apagarDespesa(tx, id))
+  } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
+    return traduzirErroPrisma(erro)
+  }
+  revalidatePath('/custos/despesas')
   revalidatePath('/financeiro')
   return { ok: true }
 }

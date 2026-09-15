@@ -69,6 +69,19 @@ async function main() {
   const abastecimento = await prisma.abastecimento.findFirstOrThrow({
     orderBy: { criadoEm: 'desc' },
   })
+  const despesaAvulsa = await prisma.lancamento.findFirstOrThrow({
+    where: {
+      tipo: 'DESPESA',
+      freteId: null,
+      parcelamentoId: null,
+      acertoId: null,
+      recorrenciaId: null,
+      abastecimento: { is: null },
+      manutencao: { is: null },
+      acertoGerado: { is: null },
+    },
+    orderBy: { criadoEm: 'desc' },
+  })
   const freteProprio = await prisma.frete.findFirstOrThrow({
     where: { modalidade: 'FROTA_PROPRIA', status: { not: 'CANCELADO' }, viagemId: { not: null } },
     orderBy: { criadoEm: 'desc' },
@@ -81,6 +94,7 @@ async function main() {
     '/custos', '/custos/abastecimentos/novo', '/custos/manutencoes/novo',
     '/custos/manutencoes', `/custos/manutencoes/${manutencao.id}`,
     '/custos/abastecimentos', `/custos/abastecimentos/${abastecimento.id}`,
+    '/custos/despesas', '/custos/despesas/nova', `/custos/despesas/${despesaAvulsa.id}`,
     `/viagens/${viagem.id}/despesas/novo`,
     '/financeiro', '/financeiro/pagar', '/financeiro/receber',
     '/acertos', `/acertos/motorista/${motorista.id}`, `/acertos/agregado/${agregado.id}`,
