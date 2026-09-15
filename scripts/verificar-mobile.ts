@@ -65,6 +65,10 @@ async function main() {
   const viagem = await prisma.viagem.findFirstOrThrow({ orderBy: { criadoEm: 'desc' } })
   const motorista = await prisma.motorista.findFirstOrThrow({ where: { ativo: true } })
   const agregado = await prisma.proprietario.findFirstOrThrow({ where: { ativo: true } })
+  const manutencao = await prisma.manutencao.findFirstOrThrow({ orderBy: { criadoEm: 'desc' } })
+  const abastecimento = await prisma.abastecimento.findFirstOrThrow({
+    orderBy: { criadoEm: 'desc' },
+  })
   const freteProprio = await prisma.frete.findFirstOrThrow({
     where: { modalidade: 'FROTA_PROPRIA', status: { not: 'CANCELADO' }, viagemId: { not: null } },
     orderBy: { criadoEm: 'desc' },
@@ -75,6 +79,8 @@ async function main() {
     '/fretes', `/viagens/${viagem.id}/fretes/novo`, '/fretes/agregado/novo', '/fretes/importar',
     `/fretes/${freteProprio.id}`,
     '/custos', '/custos/abastecimentos/novo', '/custos/manutencoes/novo',
+    '/custos/manutencoes', `/custos/manutencoes/${manutencao.id}`,
+    '/custos/abastecimentos', `/custos/abastecimentos/${abastecimento.id}`,
     `/viagens/${viagem.id}/despesas/novo`,
     '/financeiro', '/financeiro/pagar', '/financeiro/receber',
     '/acertos', `/acertos/motorista/${motorista.id}`, `/acertos/agregado/${agregado.id}`,

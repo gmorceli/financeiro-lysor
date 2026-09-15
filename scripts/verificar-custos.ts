@@ -6,6 +6,13 @@
  */
 import { PrismaClient, Prisma } from '@prisma/client'
 import { arredondar, calcularComissaoMotorista, calcularConsumo } from '../src/lib/calculos'
+import {
+  apagarAbastecimento,
+  apagarManutencao,
+  gravarAbastecimento,
+  gravarManutencao,
+} from '../src/lib/custos'
+import { baixarTitulo } from '../src/lib/titulos'
 
 const prisma = new PrismaClient()
 let falhas = 0
@@ -195,6 +202,258 @@ async function main() {
     'manutenção não é apropriada a viagem, e sim ao veículo',
     doParcelamento.every((l) => l.viagemId === null && l.veiculoId === viagem.veiculoId),
   )
+
+  // --- Corrigir o custo tem que corrigir o título --------------------------
+  // A cliente lançou manutenção com valor errado no primeiro dia de uso e não
+  // tinha como voltar atrás. Pior que a linha feia na lista: a conta a pagar e
+  // o custo do caminhão ficavam errados junto.
+  const apelido = (await prisma.veiculo.findUniqueOrThrow({
+    where: { id: viagem.veiculoId },
+    select: { apelido: true },
+  })).apelido
+
+  const baseManutencao = {
+    veiculoId: viagem.veiculoId,
+    data: viagem.dataSaida,
+    tipo: 'CORRETIVA' as const,
+    descricao: `Grade da frente ${MARCA}`,
+    formaPagamento: 'PIX' as const,
+    dataVencimento: viagem.dataSaida,
+  }
+
+  const corrigivel = await prisma.$transaction((tx) =>
+    gravarManutencao(tx, {
+      categoriaId: manutencaoCat.id,
+      apelidoVeiculo: apelido,
+      dados: { ...baseManutencao, valorPecas: 350, valorServico: 0, parcelas: 1 },
+    }),
+  )
+  const titulosDe = (id: string) =>
+    prisma.lancamento.findMany({
+      where: { parcelamentoId: id },
+      orderBy: { dataVencimento: 'asc' },
+      select: { id: true, valor: true, descricao: true, dataVencimento: true },
+    })
+
+  checar(
+    'manutenção à vista também carimba o título, para poder achá-lo de volta',
+    (await titulosDe(corrigivel)).length === 1,
+  )
+
+  await prisma.$transaction((tx) =>
+    gravarManutencao(tx, {
+      id: corrigivel,
+      categoriaId: manutencaoCat.id,
+      apelidoVeiculo: apelido,
+      dados: { ...baseManutencao, valorPecas: 3500, valorServico: 0, parcelas: 1 },
+    }),
+  )
+  const depoisDaCorrecao = await titulosDe(corrigivel)
+  checar(
+    'corrigir o valor da manutenção corrige a conta a pagar',
+    depoisDaCorrecao.length === 1 && Number(depoisDaCorrecao[0]?.valor) === 3500,
+    `${depoisDaCorrecao.length} título(s) de R$ ${Number(depoisDaCorrecao[0]?.valor)}`,
+  )
+  checar(
+    'e a manutenção continua apontando para o título que existe',
+    (await prisma.manutencao.findUniqueOrThrow({ where: { id: corrigivel } })).lancamentoId ===
+      depoisDaCorrecao[0]?.id,
+  )
+
+  // Mudar a quantidade de parcelas é outro conjunto de títulos, não uma edição
+  // de valores: é o caso em que remendar parcela a parcela erraria.
+  await prisma.$transaction((tx) =>
+    gravarManutencao(tx, {
+      id: corrigivel,
+      categoriaId: manutencaoCat.id,
+      apelidoVeiculo: apelido,
+      dados: { ...baseManutencao, valorPecas: 3500, valorServico: 0, parcelas: 4 },
+    }),
+  )
+  const emQuatro = await titulosDe(corrigivel)
+  checar(
+    'à vista vira parcelado e o contas a pagar acompanha',
+    emQuatro.length === 4 &&
+      arredondar(emQuatro.reduce((s, l) => s + Number(l.valor), 0)) === 3500,
+    `${emQuatro.length} parcelas somando R$ ${arredondar(emQuatro.reduce((s, l) => s + Number(l.valor), 0))}`,
+  )
+  checar(
+    'e os vencimentos voltam a ser mensais, sem sobrar parcela antiga',
+    new Set(emQuatro.map((l) => l.dataVencimento!.toISOString())).size === 4,
+  )
+
+  // --- Linha lançada antes do carimbo --------------------------------------
+  // As manutenções que a cliente já lançou têm `parcelamentoId` nulo, porque à
+  // vista o campo não era gravado. Se a correção só olhasse o carimbo, essas
+  // linhas — justamente as que ela precisa corrigir — ficariam órfãs.
+  const antiga = await prisma.manutencao.create({
+    data: {
+      veiculoId: viagem.veiculoId,
+      data: viagem.dataSaida,
+      tipo: 'PREVENTIVA',
+      descricao: `Pedágio lançado como manutenção ${MARCA}`,
+      valorPecas: new Prisma.Decimal(0),
+      valorServico: new Prisma.Decimal(65),
+    },
+    select: { id: true },
+  })
+  const tituloAntigo = await prisma.lancamento.create({
+    data: {
+      tipo: 'DESPESA',
+      categoriaId: manutencaoCat.id,
+      descricao: `Pedágio lançado como manutenção ${MARCA} — ${apelido}`,
+      valor: new Prisma.Decimal(65),
+      dataCompetencia: viagem.dataSaida,
+      dataVencimento: viagem.dataSaida,
+      veiculoId: viagem.veiculoId,
+      formaPagamento: 'PIX',
+      // Sem parcelamentoId: é exatamente a forma antiga.
+    },
+    select: { id: true },
+  })
+  await prisma.manutencao.update({
+    where: { id: antiga.id },
+    data: { lancamentoId: tituloAntigo.id },
+  })
+
+  await prisma.$transaction((tx) =>
+    gravarManutencao(tx, {
+      id: antiga.id,
+      categoriaId: manutencaoCat.id,
+      apelidoVeiculo: apelido,
+      dados: {
+        veiculoId: viagem.veiculoId,
+        data: viagem.dataSaida,
+        tipo: 'PREVENTIVA',
+        descricao: `Pedágio lançado como manutenção ${MARCA}`,
+        valorServico: 130,
+        formaPagamento: 'PIX',
+        dataVencimento: viagem.dataSaida,
+        parcelas: 1,
+      },
+    }),
+  )
+  const depoisDaAntiga = await titulosDe(antiga.id)
+  checar(
+    'linha lançada antes do carimbo também se corrige, sem deixar título órfão',
+    depoisDaAntiga.length === 1 && Number(depoisDaAntiga[0]?.valor) === 130,
+    `${depoisDaAntiga.length} título(s) de R$ ${Number(depoisDaAntiga[0]?.valor)}`,
+  )
+  checar(
+    'e o título velho foi apagado, não duplicado',
+    (await prisma.lancamento.count({ where: { id: tituloAntigo.id } })) === 0,
+  )
+
+  // --- Excluir leva a conta a pagar junto ----------------------------------
+  await prisma.$transaction((tx) => apagarManutencao(tx, antiga.id))
+  checar(
+    'excluir a manutenção apaga a conta a pagar que ela criou',
+    (await prisma.manutencao.count({ where: { id: antiga.id } })) === 0 &&
+      (await titulosDe(antiga.id)).length === 0,
+  )
+
+  // --- Título com baixa não se refaz ---------------------------------------
+  const comBaixa = await titulosDe(corrigivel)
+  await baixarTitulo(prisma, comBaixa[0]!.id, { data: viagem.dataSaida, valor: 100 })
+  let recusouCorrigir = false
+  try {
+    await prisma.$transaction((tx) =>
+      gravarManutencao(tx, {
+        id: corrigivel,
+        categoriaId: manutencaoCat.id,
+        apelidoVeiculo: apelido,
+        dados: { ...baseManutencao, valorPecas: 1, valorServico: 0, parcelas: 1 },
+      }),
+    )
+  } catch (erro) {
+    recusouCorrigir = erro instanceof Error && erro.message.includes('Estorne')
+  }
+  checar('manutenção com parcela paga recusa a correção', recusouCorrigir)
+  checar(
+    'e as quatro parcelas continuam de pé',
+    (await titulosDe(corrigivel)).length === 4,
+  )
+
+  let recusouExcluir = false
+  try {
+    await prisma.$transaction((tx) => apagarManutencao(tx, corrigivel))
+  } catch (erro) {
+    recusouExcluir = erro instanceof Error && erro.message.includes('Estorne')
+  }
+  checar('e a exclusão também é recusada', recusouExcluir)
+
+  // --- Abastecimento -------------------------------------------------------
+  const veiculoDoTanque = await prisma.veiculo.findUniqueOrThrow({
+    where: { id: viagem.veiculoId },
+    select: { apelido: true, tipo: true, odometroAtual: true },
+  })
+  const tanque = await prisma.$transaction((tx) =>
+    gravarAbastecimento(tx, {
+      categoriaId: combustivel.id,
+      veiculo: veiculoDoTanque,
+      dados: {
+        veiculoId: viagem.veiculoId,
+        data: viagem.dataSaida,
+        litros: 400,
+        valorTotal: 3000,
+        valorLitro: 7.5,
+        odometro: (veiculoDoTanque.odometroAtual ?? 0) + 500,
+        tanqueCheio: true,
+        formaPagamento: 'PIX',
+        observacoes: MARCA,
+      },
+    }),
+  )
+  const tituloDoTanque = async () =>
+    (await prisma.abastecimento.findUniqueOrThrow({
+      where: { id: tanque },
+      include: { lancamento: { select: { id: true, valor: true } } },
+    }))
+
+  checar(
+    'abastecimento nasce com o título pelo valor pago',
+    Number((await tituloDoTanque()).lancamento?.valor) === 3000,
+  )
+
+  await prisma.$transaction((tx) =>
+    gravarAbastecimento(tx, {
+      id: tanque,
+      categoriaId: combustivel.id,
+      veiculo: veiculoDoTanque,
+      dados: {
+        veiculoId: viagem.veiculoId,
+        data: viagem.dataSaida,
+        litros: 300,
+        valorTotal: 2250,
+        valorLitro: 7.5,
+        odometro: (veiculoDoTanque.odometroAtual ?? 0) + 500,
+        tanqueCheio: true,
+        formaPagamento: 'PIX',
+        observacoes: MARCA,
+      },
+    }),
+  )
+  const corrigido = await tituloDoTanque()
+  checar(
+    'corrigir os litros corrige o valor e o título junto',
+    Number(corrigido.litros) === 300 && Number(corrigido.lancamento?.valor) === 2250,
+    `${Number(corrigido.litros)} l / R$ ${Number(corrigido.lancamento?.valor)}`,
+  )
+  checar(
+    'e não sobra título solto do valor antigo',
+    (await prisma.lancamento.count({
+      where: { descricao: `Abastecimento — ${apelido}`, valor: new Prisma.Decimal(3000) },
+    })) === 0,
+  )
+
+  const idDoTitulo = corrigido.lancamento!.id
+  await prisma.$transaction((tx) => apagarAbastecimento(tx, tanque))
+  checar(
+    'excluir o abastecimento apaga a conta a pagar junto',
+    (await prisma.abastecimento.count({ where: { id: tanque } })) === 0 &&
+      (await prisma.lancamento.count({ where: { id: idDoTitulo } })) === 0,
+  )
+
 
   // --- Margem de contribuição da viagem ------------------------------------
   const daViagem = await prisma.viagem.findUniqueOrThrow({

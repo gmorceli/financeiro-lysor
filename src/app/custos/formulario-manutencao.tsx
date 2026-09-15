@@ -9,6 +9,22 @@ import { salvarManutencao } from './actions'
 
 const hoje = () => new Date().toISOString().slice(0, 10)
 
+/** Uma manutenção já gravada, em texto do jeito que o formulário consome. */
+export type ManutencaoExistente = {
+  id: string
+  veiculoId: string
+  fornecedorId: string
+  data: string
+  odometro: string
+  tipo: string
+  descricao: string
+  valorPecas: string
+  valorServico: string
+  formaPagamento: string
+  dataVencimento: string
+  parcelas: string
+}
+
 /**
  * Manutenção. Peças e mão de obra são separadas porque a cliente compra peça
  * fora e paga a oficina só pelo serviço — e porque saber a proporção entre as
@@ -17,14 +33,17 @@ const hoje = () => new Date().toISOString().slice(0, 10)
 export function FormularioManutencao({
   veiculos,
   fornecedores,
+  manutencao,
 }: {
   veiculos: Array<{ id: string; apelido: string; odometroAtual: number | null; tipo: string }>
   fornecedores: Array<{ id: string; nome: string }>
+  /** Presente só na correção de uma manutenção já lançada. */
+  manutencao?: ManutencaoExistente
 }) {
-  const [veiculoId, setVeiculoId] = useState('')
-  const [valorPecas, setValorPecas] = useState('')
-  const [valorServico, setValorServico] = useState('')
-  const [parcelas, setParcelas] = useState('1')
+  const [veiculoId, setVeiculoId] = useState(manutencao?.veiculoId ?? '')
+  const [valorPecas, setValorPecas] = useState(manutencao?.valorPecas ?? '')
+  const [valorServico, setValorServico] = useState(manutencao?.valorServico ?? '')
+  const [parcelas, setParcelas] = useState(manutencao?.parcelas ?? '1')
 
   const veiculo = veiculos.find((v) => v.id === veiculoId)
   const total = arredondar((Number(valorPecas) || 0) + (Number(valorServico) || 0))
@@ -34,10 +53,12 @@ export function FormularioManutencao({
     <Formulario
       action={salvarManutencao}
       voltarPara="/custos/manutencoes"
-      rotuloSalvar="Lançar manutenção"
+      rotuloSalvar={manutencao ? 'Salvar correção' : 'Lançar manutenção'}
     >
       {(erros) => (
         <>
+          {manutencao && <input type="hidden" name="id" value={manutencao.id} />}
+
           <Card className="grid gap-4 p-4 sm:grid-cols-2">
             <Campo label="Veículo" obrigatorio erro={erros.veiculoId}>
               <Select
@@ -57,11 +78,16 @@ export function FormularioManutencao({
             </Campo>
 
             <Campo label="Data" obrigatorio erro={erros.data}>
-              <Input name="data" type="date" defaultValue={hoje()} required />
+              <Input
+                name="data"
+                type="date"
+                defaultValue={manutencao?.data ?? hoje()}
+                required
+              />
             </Campo>
 
             <Campo label="Tipo" obrigatorio erro={erros.tipo}>
-              <Select name="tipo" defaultValue="CORRETIVA">
+              <Select name="tipo" defaultValue={manutencao?.tipo ?? 'CORRETIVA'}>
                 <option value="CORRETIVA">Corretiva — quebrou</option>
                 <option value="PREVENTIVA">Preventiva</option>
                 <option value="REVISAO">Revisão</option>
@@ -70,7 +96,7 @@ export function FormularioManutencao({
             </Campo>
 
             <Campo label="Oficina / fornecedor" erro={erros.fornecedorId}>
-              <Select name="fornecedorId" defaultValue="">
+              <Select name="fornecedorId" defaultValue={manutencao?.fornecedorId ?? ''}>
                 <option value="">Não informado</option>
                 {fornecedores.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -91,13 +117,18 @@ export function FormularioManutencao({
                   type="number"
                   inputMode="numeric"
                   key={veiculoId || 'sem-veiculo'}
-                  defaultValue={veiculo?.odometroAtual ?? ''}
+                  defaultValue={manutencao?.odometro || (veiculo?.odometroAtual ?? '')}
                 />
               </Campo>
             )}
 
             <Campo label="O que foi feito" obrigatorio erro={erros.descricao}>
-              <Textarea name="descricao" required placeholder="Troca de embreagem, revisão dos 100 mil…" />
+              <Textarea
+                name="descricao"
+                required
+                defaultValue={manutencao?.descricao}
+                placeholder="Troca de embreagem, revisão dos 100 mil…"
+              />
             </Campo>
           </Card>
 
@@ -125,7 +156,7 @@ export function FormularioManutencao({
             </Campo>
 
             <Campo label="Forma de pagamento" obrigatorio erro={erros.formaPagamento}>
-              <Select name="formaPagamento" defaultValue="BOLETO">
+              <Select name="formaPagamento" defaultValue={manutencao?.formaPagamento ?? 'BOLETO'}>
                 <option value="BOLETO">Boleto</option>
                 <option value="CARTAO">Cartão</option>
                 <option value="PIX">Pix</option>
@@ -152,7 +183,11 @@ export function FormularioManutencao({
               dica="Deixe em branco se pagou na hora."
               erro={erros.dataVencimento}
             >
-              <Input name="dataVencimento" type="date" />
+              <Input
+                name="dataVencimento"
+                type="date"
+                defaultValue={manutencao?.dataVencimento}
+              />
             </Campo>
 
             {total > 0 && (
