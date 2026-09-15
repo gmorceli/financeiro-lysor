@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { Formulario } from '@/components/formulario'
 import { Campo, Card, Input, Select, Textarea } from '@/components/ui'
@@ -58,6 +59,23 @@ export function FormularioManutencao({
       {(erros) => (
         <>
           {manutencao && <input type="hidden" name="id" value={manutencao.id} />}
+
+          {/*
+            A cliente lançou pedágio, placa e conserto de pneu aqui, porque era
+            a única porta aberta no menu Custos. Manutenção é custo do caminhão;
+            pedágio é custo da viagem. Dizer isso na entrada custa uma linha.
+          */}
+          <p className="text-sm text-texto-suave">
+            Isto é custo do <strong className="text-texto">caminhão</strong> — oficina,
+            peça, mão de obra. Pedágio, lavagem, licenciamento e seguro vão em{' '}
+            <Link
+              href="/custos/despesas/nova"
+              className="-my-3 inline-flex min-h-11 items-center font-medium text-primaria hover:underline sm:my-0 sm:min-h-0"
+            >
+              Despesas
+            </Link>
+            .
+          </p>
 
           <Card className="grid gap-4 p-4 sm:grid-cols-2">
             <Campo label="Veículo" obrigatorio erro={erros.veiculoId}>

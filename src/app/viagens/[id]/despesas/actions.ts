@@ -2,10 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { despesaViagemSchema } from '@/lib/validacao'
-import { arredondar } from '@/lib/calculos'
+import { apagarDespesa, gravarDespesa } from '@/lib/custos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
 import { exigirAcesso } from '@/lib/sessao'
@@ -32,21 +31,20 @@ export async function salvarDespesaViagem(
   if (!viagem) return { erroGeral: 'Viagem não encontrada.' }
 
   try {
-    await prisma.lancamento.create({
-      data: {
-        tipo: 'DESPESA',
-        categoriaId: dados.categoriaId,
-        descricao: dados.descricao,
-        valor: new Prisma.Decimal(arredondar(dados.valor)),
-        dataCompetencia: dados.data,
-        dataVencimento: dados.dataVencimento ?? dados.data,
-        viagemId: dados.viagemId,
-        veiculoId: viagem.veiculoId,
-        fornecedorId: dados.fornecedorId ?? null,
-        formaPagamento: dados.formaPagamento,
-      },
-    })
+    // Mesma gravação da tela de Despesas do menu Custos: uma função só, para as
+    // duas portas não divergirem com o tempo.
+    await prisma.$transaction((tx) =>
+      gravarDespesa(tx, {
+        dados: {
+          ...dados,
+          viagemId: dados.viagemId,
+          fornecedorId: dados.fornecedorId ?? null,
+          dataVencimento: dados.dataVencimento ?? null,
+        },
+      }),
+    )
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro)
   }
 
@@ -59,20 +57,21 @@ export async function excluirLancamento(id: string): Promise<EstadoFormulario> {
   try {
     const lancamento = await prisma.lancamento.findUnique({
       where: { id },
-      select: { viagemId: true, dataPagamento: true },
+      select: { viagemId: true },
     })
     if (!lancamento) return { erroGeral: 'Lançamento não encontrado.' }
 
-    // Título já pago é imutável: a correção se faz por estorno.
-    if (lancamento.dataPagamento) {
-      return {
-        erroGeral: 'Este lançamento já foi pago. Faça um estorno em vez de excluir.',
-      }
-    }
-
-    await prisma.lancamento.delete({ where: { id } })
+    /*
+      Delegado para a mesma função da tela de Despesas, que recusa o que tem
+      dono em outro lugar. Antes esta ação apagava qualquer título: o do
+      abastecimento ia junto, deixando o abastecimento apontando para um
+      registro que não existia mais — ou estourando a referência com um erro
+      que não dizia nada.
+    */
+    await prisma.$transaction((tx) => apagarDespesa(tx, id))
     if (lancamento.viagemId) revalidatePath(`/viagens/${lancamento.viagemId}`)
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro)
   }
   return { ok: true }

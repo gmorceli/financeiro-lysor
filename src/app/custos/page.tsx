@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import { DESPESA_AVULSA } from '@/lib/custos'
 import { formatarMoeda } from '@/lib/utils'
 import { CabecalhoPagina, Card } from '@/components/ui'
 
@@ -14,7 +15,7 @@ function inicioDoMes() {
 export default async function Custos() {
   const desde = inicioDoMes()
 
-  const [combustivel, manutencao, outros] = await Promise.all([
+  const [combustivel, manutencao, despesas] = await Promise.all([
     prisma.lancamento.aggregate({
       _sum: { valor: true },
       where: { tipo: 'DESPESA', dataCompetencia: { gte: desde }, categoria: { nome: 'Combustível' } },
@@ -29,11 +30,7 @@ export default async function Custos() {
     }),
     prisma.lancamento.aggregate({
       _sum: { valor: true },
-      where: {
-        tipo: 'DESPESA',
-        dataCompetencia: { gte: desde },
-        categoria: { nome: { notIn: ['Combustível', 'Manutenção', 'Pneus'] } },
-      },
+      where: { dataCompetencia: { gte: desde }, ...DESPESA_AVULSA },
     }),
   ])
 
@@ -50,6 +47,12 @@ export default async function Custos() {
       descricao: 'Peças, mão de obra e pneus',
       total: manutencao._sum.valor,
     },
+    {
+      href: '/custos/despesas',
+      rotulo: 'Despesas',
+      descricao: 'Pedágio, lavagem, seguro, licenciamento, contador',
+      total: despesas._sum.valor,
+    },
   ] as const
 
   return (
@@ -59,7 +62,7 @@ export default async function Custos() {
         descricao="Todo custo lançado aqui já entra como conta a pagar."
       />
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {cartoes.map((cartao) => (
           <Link key={cartao.href} href={cartao.href} className="group">
             <Card className="h-full p-4 transition-colors group-hover:border-primaria/40">
@@ -76,11 +79,18 @@ export default async function Custos() {
         ))}
       </div>
 
+      {/*
+        Este aviso já existia como parágrafo solto e não funcionou: a cliente
+        lançou pedágio como manutenção preventiva, porque manutenção era um
+        cartão clicável e isto era um texto. Agora "Despesas" é um cartão
+        também, e o texto só explica quando vale a pena usar a tela da viagem.
+      */}
       <Card className="p-4">
         <p className="text-sm text-texto-suave">
-          Despesas de viagem — pedágio, chapa, lavagem — são lançadas dentro da própria
-          viagem, para entrarem no custo daquele frete. Outros custos do mês somam{' '}
-          <strong className="text-texto">{formatarMoeda(outros._sum.valor ?? 0)}</strong>.
+          Pedágio, chapa e lavagem de uma viagem específica ficam melhores lançados{' '}
+          <strong className="text-texto">de dentro da própria viagem</strong> — assim
+          entram no lucro daquele frete. Pela tela de Despesas também dá, escolhendo a
+          viagem na lista.
         </p>
       </Card>
     </>

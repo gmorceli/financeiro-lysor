@@ -365,6 +365,34 @@ export const despesaViagemSchema = z.object({
   dataVencimento: dataOpcional,
 })
 
+/**
+ * Despesa que não é abastecimento nem manutenção.
+ *
+ * A viagem é opcional aqui, e o `despesaViagemSchema` acima é o mesmo com ela
+ * obrigatória. Pedágio lançado sem viagem ainda entra no resultado — só não
+ * sabe de qual frete é, e a tela avisa isso antes de salvar.
+ */
+export const despesaSchema = z.object({
+  categoriaId: z.string().trim().min(1, 'Escolha o tipo de despesa'),
+  viagemId: textoOpcional,
+  veiculoId: textoOpcional,
+  fornecedorId: textoOpcional,
+  data: dataObrigatoria,
+  descricao: z.string().trim().min(2, 'Diga do que se trata'),
+  valor: numeroObrigatorio('o valor').refine((v) => v > 0, 'Precisa ser maior que zero'),
+  formaPagamento: z.enum([
+    'DINHEIRO',
+    'PIX',
+    'CHEQUE',
+    'BOLETO',
+    'CARTAO',
+    'TRANSFERENCIA',
+  ]),
+  dataVencimento: dataOpcional,
+  observacoes: textoOpcional,
+})
+
+export type DespesaInput = z.infer<typeof despesaSchema>
 export type AbastecimentoInput = z.infer<typeof abastecimentoSchema>
 export type ManutencaoInput = z.infer<typeof manutencaoSchema>
 export type DespesaViagemInput = z.infer<typeof despesaViagemSchema>

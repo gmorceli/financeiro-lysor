@@ -54,7 +54,12 @@ export default async function DetalheViagem({
       },
       lancamentos: {
         where: { tipo: 'DESPESA', status: { not: 'CANCELADO' } },
-        include: { categoria: { select: { nome: true } } },
+        include: {
+          categoria: { select: { nome: true } },
+          // Para saber qual ação oferecer: o título de um abastecimento se
+          // corrige na tela do abastecimento, não se apaga por aqui.
+          abastecimento: { select: { id: true } },
+        },
         orderBy: { dataCompetencia: 'asc' },
       },
       abastecimentos: { select: { litros: true } },
@@ -282,15 +287,33 @@ export default async function DetalheViagem({
                   </Td>
                   {/*
                     Lançar R$ 3.000 onde era R$ 300 é o erro mais fácil de
-                    cometer aqui. Sem este botão, o jeito de corrigir era abrir
-                    o banco.
+                    cometer aqui. Sem esta coluna, o jeito de corrigir era abrir
+                    o banco. Cada tipo volta pela porta de onde entrou: o
+                    abastecimento pela tela dele, a despesa pela dela.
                   */}
                   <Td className="text-right">
-                    {Number(lancamento.valorPago) === 0 && (
-                      <ExcluirCusto
-                        lancamentoId={lancamento.id}
-                        descricao={lancamento.descricao}
-                      />
+                    {lancamento.abastecimento ? (
+                      <Link
+                        href={rota(`/custos/abastecimentos/${lancamento.abastecimento.id}`)}
+                        className={LINK_TABELA}
+                      >
+                        Corrigir
+                      </Link>
+                    ) : (
+                      <span className="flex items-center justify-end gap-3">
+                        <Link
+                          href={rota(`/custos/despesas/${lancamento.id}`)}
+                          className={LINK_TABELA}
+                        >
+                          Corrigir
+                        </Link>
+                        {Number(lancamento.valorPago) === 0 && (
+                          <ExcluirCusto
+                            lancamentoId={lancamento.id}
+                            descricao={lancamento.descricao}
+                          />
+                        )}
+                      </span>
                     )}
                   </Td>
                 </tr>

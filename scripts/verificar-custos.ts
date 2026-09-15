@@ -8,9 +8,12 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { arredondar, calcularComissaoMotorista, calcularConsumo } from '../src/lib/calculos'
 import {
   apagarAbastecimento,
+  apagarDespesa,
   apagarManutencao,
   gravarAbastecimento,
+  gravarDespesa,
   gravarManutencao,
+  DESPESA_AVULSA,
 } from '../src/lib/custos'
 import { baixarTitulo } from '../src/lib/titulos'
 
@@ -25,6 +28,20 @@ const MARCA = 'teste-custos'
 
 async function main() {
   await prisma.abastecimento.deleteMany({ where: { OR: [{ lancamento: { observacoes: MARCA } }, { viagem: { observacoes: MARCA } }] } })
+  // As baixas vão primeiro: a asserção de "título pago recusa correção" deixa
+  // uma baixa para trás, e sem isto a limpeza da rodada seguinte esbarra na
+  // referência.
+  await prisma.baixa.deleteMany({
+    where: {
+      lancamento: {
+        OR: [
+          { observacoes: MARCA },
+          { descricao: { contains: MARCA } },
+          { viagem: { observacoes: MARCA } },
+        ],
+      },
+    },
+  })
   await prisma.lancamento.deleteMany({ where: { observacoes: MARCA } })
   await prisma.lancamento.deleteMany({ where: { descricao: { contains: MARCA } } })
   await prisma.lancamento.deleteMany({ where: { viagem: { observacoes: MARCA } } })
@@ -452,6 +469,123 @@ async function main() {
     'excluir o abastecimento apaga a conta a pagar junto',
     (await prisma.abastecimento.count({ where: { id: tanque } })) === 0 &&
       (await prisma.lancamento.count({ where: { id: idDoTitulo } })) === 0,
+  )
+
+
+  // --- Despesa avulsa: a porta que faltava ---------------------------------
+  // A cliente lançava pedágio como manutenção preventiva, porque manutenção era
+  // a única porta aberta no menu Custos. O custo não sumia — ia para a camada
+  // errada da cascata, e o caminhão parecia caro de manter por causa de pedágio.
+  const pedagioCat = await prisma.categoria.findUniqueOrThrow({
+    where: { nome: 'Pedágio' },
+  })
+  checar(
+    'pedágio é custo direto da viagem, não do caminhão',
+    pedagioCat.nivelCusto === 'DIRETO_VIAGEM' && manutencaoCat.nivelCusto === 'VEICULO',
+    `pedágio ${pedagioCat.nivelCusto} / manutenção ${manutencaoCat.nivelCusto}`,
+  )
+
+  const despesaId = await prisma.$transaction((tx) =>
+    gravarDespesa(tx, {
+      dados: {
+        categoriaId: pedagioCat.id,
+        descricao: `Pedágio da BR-070 ${MARCA}`,
+        valor: 65,
+        data: viagem.dataSaida,
+        viagemId: viagem.id,
+        formaPagamento: 'DINHEIRO',
+      },
+    }),
+  )
+  const comoFicou = await prisma.lancamento.findUniqueOrThrow({
+    where: { id: despesaId },
+    include: { categoria: { select: { nivelCusto: true } } },
+  })
+  checar(
+    'despesa lançada na viagem cai na camada de custo da viagem',
+    comoFicou.categoria.nivelCusto === 'DIRETO_VIAGEM' && comoFicou.viagemId === viagem.id,
+  )
+  checar(
+    'e herda o caminhão da viagem sem a pessoa escolher duas vezes',
+    comoFicou.veiculoId === viagem.veiculoId,
+    comoFicou.veiculoId ?? 'nenhum',
+  )
+
+  // O filtro da tela: nada que tenha dono em outro lugar pode ser editado por
+  // ela. Um id colado na barra de endereço não vira porta dos fundos.
+  const avulsas = await prisma.lancamento.findMany({
+    where: { ...DESPESA_AVULSA, descricao: { contains: MARCA } },
+    select: { id: true },
+  })
+  checar(
+    'a despesa recém-criada entra na lista de despesas avulsas',
+    avulsas.some((l) => l.id === despesaId),
+  )
+  const tituloDeManutencao = (await prisma.lancamento.findFirstOrThrow({
+    where: { parcelamentoId: { not: null }, descricao: { contains: MARCA } },
+    select: { id: true },
+  })).id
+  checar(
+    'e o título de uma manutenção fica de fora dela',
+    !avulsas.some((l) => l.id === tituloDeManutencao),
+  )
+
+  let recusouTituloAlheio = false
+  try {
+    await prisma.$transaction((tx) =>
+      gravarDespesa(tx, {
+        id: tituloDeManutencao,
+        dados: {
+          categoriaId: pedagioCat.id,
+          descricao: 'invasão',
+          valor: 1,
+          data: viagem.dataSaida,
+          formaPagamento: 'PIX',
+        },
+      }),
+    )
+  } catch (erro) {
+    recusouTituloAlheio = erro instanceof Error && erro.message.includes('corrija pela tela dele')
+  }
+  checar('editar título de manutenção pela tela de despesa é recusado', recusouTituloAlheio)
+
+  let recusouApagarAlheio = false
+  try {
+    await prisma.$transaction((tx) => apagarDespesa(tx, tituloDeManutencao))
+  } catch (erro) {
+    recusouApagarAlheio = erro instanceof Error && erro.message.includes('exclua pela tela dele')
+  }
+  checar('e apagá-lo também', recusouApagarAlheio)
+  checar(
+    'o título da manutenção continua intacto',
+    (await prisma.lancamento.count({ where: { id: tituloDeManutencao } })) === 1,
+  )
+
+  // Corrigir a despesa: é o caso do pedágio que entrou no caminhão errado.
+  await prisma.$transaction((tx) =>
+    gravarDespesa(tx, {
+      id: despesaId,
+      dados: {
+        categoriaId: pedagioCat.id,
+        descricao: `Pedágio da BR-070 ${MARCA}`,
+        valor: 130,
+        data: viagem.dataSaida,
+        viagemId: null,
+        formaPagamento: 'DINHEIRO',
+      },
+    }),
+  )
+  const semViagem = await prisma.lancamento.findUniqueOrThrow({ where: { id: despesaId } })
+  checar(
+    'corrigir a despesa muda valor e solta a viagem',
+    Number(semViagem.valor) === 130 && semViagem.viagemId === null,
+    `R$ ${Number(semViagem.valor)}, viagem ${semViagem.viagemId ?? 'nenhuma'}`,
+  )
+
+  await prisma.$transaction((tx) => apagarDespesa(tx, despesaId))
+  checar(
+    'excluir a despesa some com o título',
+    (await prisma.lancamento.count({ where: { id: despesaId } })) === 0,
   )
 
 
