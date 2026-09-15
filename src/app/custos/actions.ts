@@ -2,10 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { abastecimentoSchema, manutencaoSchema } from '@/lib/validacao'
-import { arredondar, somarMeses } from '@/lib/calculos'
+import {
+  apagarAbastecimento,
+  apagarManutencao,
+  gravarAbastecimento,
+  gravarManutencao,
+} from '@/lib/custos'
 import { CATEGORIA, idDaCategoria } from '@/lib/categorias'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
@@ -18,12 +22,16 @@ import { exigirAcesso } from '@/lib/sessao'
  * "lançar a conta a pagar". Um registro só, com competência, vencimento e
  * pagamento separados — assim o relatório gerencial e o financeiro não têm
  * como divergir.
+ *
+ * O miolo — gravar, refazer os títulos e apagar — mora em `@/lib/custos`.
+ * Aqui fica só o que é da requisição: permissão, validação e para onde voltar.
  */
 export async function salvarAbastecimento(
   _estado: EstadoFormulario,
   formData: FormData,
 ): Promise<EstadoFormulario> {
   await exigirAcesso('operacao')
+  const id = formData.get('id')?.toString() || undefined
   const validado = validarFormulario(abastecimentoSchema, formData)
   if (!validado.sucesso) return validado.estado
 
@@ -37,61 +45,51 @@ export async function salvarAbastecimento(
   const categoriaId = await idDaCategoria(CATEGORIA.COMBUSTIVEL)
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const lancamento = await tx.lancamento.create({
-        data: {
-          tipo: 'DESPESA',
-          categoriaId,
-          descricao: `Abastecimento — ${veiculo.apelido}`,
-          valor: new Prisma.Decimal(arredondar(dados.valorTotal)),
-          dataCompetencia: dados.data,
-          dataVencimento: dados.dataVencimento ?? dados.data,
-          veiculoId: dados.veiculoId,
-          viagemId: dados.viagemId ?? null,
-          fornecedorId: dados.fornecedorId ?? null,
-          formaPagamento: dados.formaPagamento,
-          observacoes: dados.observacoes ?? null,
-        },
-        select: { id: true },
-      })
-
-      await tx.abastecimento.create({
-        data: {
-          veiculoId: dados.veiculoId,
+    await prisma.$transaction((tx) =>
+      gravarAbastecimento(tx, {
+        id,
+        categoriaId,
+        veiculo,
+        dados: {
+          ...dados,
+          valorLitro: dados.valorTotal / dados.litros,
           viagemId: dados.viagemId ?? null,
           motoristaId: dados.motoristaId ?? null,
           fornecedorId: dados.fornecedorId ?? null,
-          data: dados.data,
-          litros: new Prisma.Decimal(dados.litros),
-          valorLitro: new Prisma.Decimal(dados.valorLitro.toFixed(4)),
-          valorTotal: new Prisma.Decimal(arredondar(dados.valorTotal)),
-          odometro: dados.odometro,
-          tanqueCheio: dados.tanqueCheio,
-          lancamentoId: lancamento.id,
+          dataVencimento: dados.dataVencimento ?? null,
+          observacoes: dados.observacoes ?? null,
         },
-      })
-
-      // O odômetro só avança; um abastecimento antigo lançado depois não pode
-      // puxar a leitura do veículo para trás.
-      if (
-        veiculo.tipo !== 'CARRETA' &&
-        dados.odometro > (veiculo.odometroAtual ?? 0)
-      ) {
-        await tx.veiculo.update({
-          where: { id: dados.veiculoId },
-          data: { odometroAtual: dados.odometro },
-        })
-      }
-    })
+      }),
+    )
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro)
   }
 
   revalidatePath('/custos/abastecimentos')
   if (dados.viagemId) revalidatePath(`/viagens/${dados.viagemId}`)
+  revalidatePath('/financeiro')
   redirect(rota(dados.viagemId ? `/viagens/${dados.viagemId}` : '/custos/abastecimentos'))
 }
 
+export async function excluirAbastecimento(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
+  try {
+    await prisma.$transaction((tx) => apagarAbastecimento(tx, id))
+  } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
+    return traduzirErroPrisma(erro)
+  }
+  revalidatePath('/custos/abastecimentos')
+  revalidatePath('/financeiro')
+  return { ok: true }
+}
+
+/**
+ * Manutenção. Peças e mão de obra viram um título só, opcionalmente
+ * parcelado — as folhas da cliente trazem "parcelado cartão" e "parcelado
+ * boleto" ao lado das despesas de oficina.
+ */
 /**
  * Manutenção. Peças e mão de obra viram um título só, opcionalmente
  * parcelado — as folhas da cliente trazem "parcelado cartão" e "parcelado
@@ -102,6 +100,7 @@ export async function salvarManutencao(
   formData: FormData,
 ): Promise<EstadoFormulario> {
   await exigirAcesso('operacao')
+  const id = formData.get('id')?.toString() || undefined
   const validado = validarFormulario(manutencaoSchema, formData)
   if (!validado.sucesso) return validado.estado
 
@@ -112,75 +111,43 @@ export async function salvarManutencao(
   })
   if (!veiculo) return { erroGeral: 'Veículo não encontrado.' }
 
-  const total = arredondar((dados.valorPecas ?? 0) + (dados.valorServico ?? 0))
-  const parcelas = Math.max(1, Math.trunc(dados.parcelas ?? 1))
   const categoriaId = await idDaCategoria(
     dados.tipo === 'PNEU' ? CATEGORIA.PNEUS : CATEGORIA.MANUTENCAO,
   )
-  const primeiroVencimento = dados.dataVencimento ?? dados.data
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const manutencao = await tx.manutencao.create({
-        data: {
-          veiculoId: dados.veiculoId,
+    await prisma.$transaction((tx) =>
+      gravarManutencao(tx, {
+        id,
+        categoriaId,
+        apelidoVeiculo: veiculo.apelido,
+        dados: {
+          ...dados,
           fornecedorId: dados.fornecedorId ?? null,
-          data: dados.data,
           odometro: dados.odometro ?? null,
-          tipo: dados.tipo,
-          descricao: dados.descricao,
-          valorPecas: new Prisma.Decimal(arredondar(dados.valorPecas ?? 0)),
-          valorServico: new Prisma.Decimal(arredondar(dados.valorServico ?? 0)),
+          dataVencimento: dados.dataVencimento ?? null,
         },
-        select: { id: true },
-      })
-
-      const parcelamentoId = parcelas > 1 ? manutencao.id : null
-      // A última parcela absorve o resíduo do arredondamento, para a soma das
-      // parcelas fechar exatamente com o total.
-      const valorParcela = arredondar(total / parcelas)
-      const residuo = arredondar(total - valorParcela * parcelas)
-
-      for (let i = 0; i < parcelas; i++) {
-        const vencimento = somarMeses(primeiroVencimento, i)
-        const ehUltima = i === parcelas - 1
-
-        const lancamento = await tx.lancamento.create({
-          data: {
-            tipo: 'DESPESA',
-            categoriaId,
-            descricao:
-              parcelas > 1
-                ? `${dados.descricao} — ${veiculo.apelido} (${i + 1}/${parcelas})`
-                : `${dados.descricao} — ${veiculo.apelido}`,
-            valor: new Prisma.Decimal(
-              ehUltima ? arredondar(valorParcela + residuo) : valorParcela,
-            ),
-            dataCompetencia: dados.data,
-            dataVencimento: vencimento,
-            veiculoId: dados.veiculoId,
-            fornecedorId: dados.fornecedorId ?? null,
-            formaPagamento: dados.formaPagamento,
-            parcelamentoId,
-            parcelaNumero: parcelas > 1 ? i + 1 : null,
-            parcelaTotal: parcelas > 1 ? parcelas : null,
-          },
-          select: { id: true },
-        })
-
-        // A manutenção aponta para o primeiro título do parcelamento.
-        if (i === 0) {
-          await tx.manutencao.update({
-            where: { id: manutencao.id },
-            data: { lancamentoId: lancamento.id },
-          })
-        }
-      }
-    })
+      }),
+    )
   } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
     return traduzirErroPrisma(erro)
   }
 
   revalidatePath('/custos/manutencoes')
+  revalidatePath('/financeiro')
   redirect(rota('/custos/manutencoes'))
+}
+
+export async function excluirManutencao(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
+  try {
+    await prisma.$transaction((tx) => apagarManutencao(tx, id))
+  } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
+    return traduzirErroPrisma(erro)
+  }
+  revalidatePath('/custos/manutencoes')
+  revalidatePath('/financeiro')
+  return { ok: true }
 }

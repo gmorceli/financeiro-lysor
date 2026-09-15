@@ -1,13 +1,14 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { calcularConsumo } from '@/lib/calculos'
-import { formatarData, formatarMoeda, formatarNumero } from '@/lib/utils'
+import { formatarData, formatarMoeda, formatarNumero, rota } from '@/lib/utils'
 import {
   Badge,
   Button,
   CabecalhoPagina,
   Card,
   EstadoVazio,
+  LINK_TABELA,
   Tabela,
   Td,
   Th,
@@ -85,6 +86,7 @@ export default async function ListaAbastecimentos() {
                 <Th className="text-right">Total</Th>
                 <Th className="text-right">km/l</Th>
                 <Th>Posto</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
@@ -115,6 +117,18 @@ export default async function ListaAbastecimentos() {
                       {consumo == null ? '—' : consumo.toFixed(2).replace('.', ',')}
                     </Td>
                     <Td className="text-texto-suave">{a.fornecedor?.nome ?? '—'}</Td>
+                    {/*
+                      Um litro digitado a mais estraga o km/l, o custo por km e a
+                      margem da viagem. Precisa ter volta.
+                    */}
+                    <Td className="text-right">
+                      <Link
+                        href={rota(`/custos/abastecimentos/${a.id}`)}
+                        className={LINK_TABELA}
+                      >
+                        Corrigir
+                      </Link>
+                    </Td>
                   </tr>
                 )
               })}

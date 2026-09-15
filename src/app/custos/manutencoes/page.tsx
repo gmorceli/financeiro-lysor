@@ -1,7 +1,17 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { formatarData, formatarMoeda, formatarNumero } from '@/lib/utils'
-import { Badge, Button, CabecalhoPagina, Card, EstadoVazio, Tabela, Td, Th } from '@/components/ui'
+import { formatarData, formatarMoeda, formatarNumero, rota } from '@/lib/utils'
+import {
+  Badge,
+  Button,
+  CabecalhoPagina,
+  Card,
+  EstadoVazio,
+  LINK_TABELA,
+  Tabela,
+  Td,
+  Th,
+} from '@/components/ui'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +74,7 @@ export default async function ListaManutencoes() {
                 <Th className="text-right">Peças</Th>
                 <Th className="text-right">Serviço</Th>
                 <Th className="text-right">Total</Th>
+                <Th />
               </tr>
             </thead>
             <tbody>
@@ -88,6 +99,16 @@ export default async function ListaManutencoes() {
                   </Td>
                   <Td className="text-right tabular-nums font-medium text-texto">
                     {formatarMoeda(Number(m.valorPecas) + Number(m.valorServico))}
+                  </Td>
+                  {/*
+                    Sem esta coluna o lançamento entrava e não saía: valor
+                    digitado errado ia para o contas a pagar e para o custo do
+                    caminhão, e ficava lá.
+                  */}
+                  <Td className="text-right">
+                    <Link href={rota(`/custos/manutencoes/${m.id}`)} className={LINK_TABELA}>
+                      Corrigir
+                    </Link>
                   </Td>
                 </tr>
               ))}

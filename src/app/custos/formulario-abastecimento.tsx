@@ -9,6 +9,22 @@ import { salvarAbastecimento } from './actions'
 
 const hoje = () => new Date().toISOString().slice(0, 10)
 
+/** Um abastecimento já gravado, em texto do jeito que o formulário consome. */
+export type AbastecimentoExistente = {
+  id: string
+  veiculoId: string
+  motoristaId: string
+  fornecedorId: string
+  data: string
+  litros: string
+  valorTotal: string
+  odometro: string
+  tanqueCheio: boolean
+  formaPagamento: string
+  dataVencimento: string
+  observacoes: string
+}
+
 export type VeiculoAbastecimento = {
   id: string
   apelido: string
@@ -35,6 +51,7 @@ export function FormularioAbastecimento({
   viagemId,
   veiculoFixoId,
   motoristaSugeridoId,
+  abastecimento,
 }: {
   veiculos: VeiculoAbastecimento[]
   motoristas: Array<{ id: string; nome: string }>
@@ -42,12 +59,16 @@ export function FormularioAbastecimento({
   viagemId?: string
   veiculoFixoId?: string
   motoristaSugeridoId?: string
+  /** Presente só na correção de um abastecimento já lançado. */
+  abastecimento?: AbastecimentoExistente
 }) {
-  const [veiculoId, setVeiculoId] = useState(veiculoFixoId ?? '')
-  const [litros, setLitros] = useState('')
-  const [valorTotal, setValorTotal] = useState('')
-  const [odometro, setOdometro] = useState('')
-  const [tanqueCheio, setTanqueCheio] = useState(true)
+  const [veiculoId, setVeiculoId] = useState(
+    abastecimento?.veiculoId ?? veiculoFixoId ?? '',
+  )
+  const [litros, setLitros] = useState(abastecimento?.litros ?? '')
+  const [valorTotal, setValorTotal] = useState(abastecimento?.valorTotal ?? '')
+  const [odometro, setOdometro] = useState(abastecimento?.odometro ?? '')
+  const [tanqueCheio, setTanqueCheio] = useState(abastecimento?.tanqueCheio ?? true)
 
   const veiculo = veiculos.find((v) => v.id === veiculoId)
   const litrosNum = Number(litros)
@@ -69,10 +90,11 @@ export function FormularioAbastecimento({
     <Formulario
       action={salvarAbastecimento}
       voltarPara="/custos/abastecimentos"
-      rotuloSalvar="Lançar abastecimento"
+      rotuloSalvar={abastecimento ? 'Salvar correção' : 'Lançar abastecimento'}
     >
       {(erros) => (
         <>
+          {abastecimento && <input type="hidden" name="id" value={abastecimento.id} />}
           {viagemId && <input type="hidden" name="viagemId" value={viagemId} />}
 
           <Card className="grid gap-4 p-4 sm:grid-cols-2">
@@ -96,7 +118,12 @@ export function FormularioAbastecimento({
             </Campo>
 
             <Campo label="Data" obrigatorio erro={erros.data}>
-              <Input name="data" type="date" defaultValue={hoje()} required />
+              <Input
+                name="data"
+                type="date"
+                defaultValue={abastecimento?.data ?? hoje()}
+                required
+              />
             </Campo>
 
             <Campo
@@ -145,7 +172,7 @@ export function FormularioAbastecimento({
             </Campo>
 
             <Campo label="Posto" erro={erros.fornecedorId}>
-              <Select name="fornecedorId" defaultValue="">
+              <Select name="fornecedorId" defaultValue={abastecimento?.fornecedorId ?? ''}>
                 <option value="">Não informado</option>
                 {fornecedores.map((f) => (
                   <option key={f.id} value={f.id}>
@@ -156,7 +183,10 @@ export function FormularioAbastecimento({
             </Campo>
 
             <Campo label="Motorista" erro={erros.motoristaId}>
-              <Select name="motoristaId" defaultValue={motoristaSugeridoId ?? ''}>
+              <Select
+                name="motoristaId"
+                defaultValue={abastecimento?.motoristaId ?? motoristaSugeridoId ?? ''}
+              >
                 <option value="">Não informado</option>
                 {motoristas.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -205,7 +235,10 @@ export function FormularioAbastecimento({
 
           <Card className="grid gap-4 p-4 sm:grid-cols-2">
             <Campo label="Forma de pagamento" obrigatorio erro={erros.formaPagamento}>
-              <Select name="formaPagamento" defaultValue="BOLETO">
+              <Select
+                name="formaPagamento"
+                defaultValue={abastecimento?.formaPagamento ?? 'BOLETO'}
+              >
                 <option value="BOLETO">Boleto / faturado</option>
                 <option value="PIX">Pix</option>
                 <option value="DINHEIRO">Dinheiro</option>
@@ -220,11 +253,15 @@ export function FormularioAbastecimento({
               dica="Deixe em branco se pagou na hora."
               erro={erros.dataVencimento}
             >
-              <Input name="dataVencimento" type="date" />
+              <Input
+                name="dataVencimento"
+                type="date"
+                defaultValue={abastecimento?.dataVencimento}
+              />
             </Campo>
 
             <Campo label="Observações" erro={erros.observacoes}>
-              <Textarea name="observacoes" />
+              <Textarea name="observacoes" defaultValue={abastecimento?.observacoes} />
             </Campo>
           </Card>
         </>
