@@ -101,7 +101,7 @@ async function main() {
     '/relatorios', '/relatorios/fretes',
     '/cadastros/veiculos', '/cadastros/veiculos/novo', '/cadastros/motoristas/novo',
     '/cadastros/clientes/novo', '/cadastros/agregados/novo', '/cadastros/fornecedores/novo',
-    '/usuarios', '/usuarios/novo', `/usuarios/${usuario.id}`, '/conta/senha',
+    '/usuarios', '/usuarios/novo', `/usuarios/${usuario.id}`, '/conta/senha', '/ajuda',
   ]
 
   const navegador = await playwright.chromium.launch({

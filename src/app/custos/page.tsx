@@ -92,6 +92,16 @@ export default async function Custos() {
           entram no lucro daquele frete. Pela tela de Despesas também dá, escolhendo a
           viagem na lista.
         </p>
+        <p className="mt-2 text-sm text-texto-suave">
+          Na dúvida sobre onde lançar,{' '}
+          <Link
+            href="/ajuda"
+            className="-my-3 inline-flex min-h-11 items-center font-medium text-primaria hover:underline sm:my-0 sm:min-h-0"
+          >
+            veja a ajuda
+          </Link>
+          .
+        </p>
       </Card>
     </>
   )
