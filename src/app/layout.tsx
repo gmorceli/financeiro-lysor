@@ -52,6 +52,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                         </Link>
                       </li>
                     ))}
+                    {/*
+                      Fora do NAVEGACAO porque não é área: ajuda não se
+                      restringe por perfil, todo mundo logado alcança.
+                    */}
+                    <li>
+                      <Link
+                        href="/ajuda"
+                        className="flex min-h-11 items-center rounded-lg px-3 py-1.5 text-sm text-texto-suave transition-colors hover:bg-fundo hover:text-texto sm:min-h-0"
+                      >
+                        Ajuda
+                      </Link>
+                    </li>
                   </ul>
                 </nav>
               )}

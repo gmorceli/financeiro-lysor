@@ -400,7 +400,14 @@ async function main() {
   const semGuarda = pastas.filter((n) => {
     if (SEM_LAYOUT.has(n)) return false
     try {
-      return !readFileSync(join('src/app', n, 'layout.tsx'), 'utf8').includes('exigirAcesso(')
+      /*
+        `exigirAcesso` recorta por área; `exigirUsuario` só exige estar logado.
+        Tela que vale para todo perfil — a ajuda — é guardada pela segunda, e
+        exigir a primeira empurraria a pasta para a lista de exceções, que é
+        onde uma tela sem guarda nenhuma passaria despercebida.
+      */
+      const layout = readFileSync(join('src/app', n, 'layout.tsx'), 'utf8')
+      return !/exigirAcesso\(|exigirUsuario\(/.test(layout)
     } catch {
       return true
     }
@@ -408,7 +415,12 @@ async function main() {
   checar(
     'toda área tem layout com guarda de permissão',
     semGuarda.length === 0,
-    semGuarda.length ? `sem layout: ${semGuarda.join(', ')}` : pastas.join(', '),
+    // No verde, lista só as pastas realmente guardadas: dizer "entrar" e
+    // "sem-acesso" num relatório de guarda dá a impressão errada de que as
+    // telas públicas também estão trancadas.
+    semGuarda.length
+      ? `sem layout: ${semGuarda.join(', ')}`
+      : `${pastas.filter((n) => !SEM_LAYOUT.has(n)).join(', ')} (públicas: ${[...SEM_LAYOUT].join(', ')})`,
   )
 
   // --- 12. Nada de servidor no bundle do navegador -----------------------
