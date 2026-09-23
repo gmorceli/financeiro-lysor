@@ -123,7 +123,8 @@ async function main() {
   await prisma.abastecimento.create({
     data: {
       veiculoId: veiculo.id,
-      viagemId: viagem.id,
+      // Sem viagem: o abastecimento é do caminhão. Os litros do mês entram no
+      // km/l do veículo pela data, não pelo vínculo com a viagem.
       data: new Date(Date.UTC(ANO, MES - 1, 10)),
       litros: new Prisma.Decimal(400),
       valorLitro: new Prisma.Decimal(7.5),
@@ -204,10 +205,18 @@ async function main() {
   const fAgregado = porFrete.find((f) => f.veiculo === null)!
 
   checar('três fretes no período', porFrete.length === 3)
+  // O diesel ficou de fora deste relatório de propósito: um tanque cheio atende
+  // várias viagens, e qualquer critério de divisão seria invenção com cara de
+  // número exato. Sobram pedágio (R$ 300) e comissão (R$ 1.800) = R$ 2.100.
   checar(
-    'rateio do custo direto é proporcional à receita (2/3 e 1/3)',
-    f1.custoDiretoRateado === 3400 && f2.custoDiretoRateado === 1700,
-    `R$ ${f1.custoDiretoRateado} e R$ ${f2.custoDiretoRateado} de R$ 5.100`,
+    'o combustível NÃO entra no rateio por frete',
+    arredondar(f1.custoDiretoRateado + f2.custoDiretoRateado) === 2100,
+    `R$ ${arredondar(f1.custoDiretoRateado + f2.custoDiretoRateado)} (2.100 = 300 de pedágio + 1.800 de comissão)`,
+  )
+  checar(
+    'pedágio e comissão seguem proporcionais à receita (2/3 e 1/3)',
+    f1.custoDiretoRateado === 1400 && f2.custoDiretoRateado === 700,
+    `R$ ${f1.custoDiretoRateado} e R$ ${f2.custoDiretoRateado} de R$ 2.100`,
   )
   checar(
     'rateio do custo do caminhão segue a mesma proporção',
@@ -215,13 +224,12 @@ async function main() {
     `R$ ${f1.custoVeiculoRateado} e R$ ${f2.custoVeiculoRateado} de R$ 5.000`,
   )
   checar(
-    'a soma dos rateios reconstrói o custo original',
-    arredondar(f1.custoDiretoRateado + f2.custoDiretoRateado) === 5100 &&
-      arredondar(f1.custoVeiculoRateado + f2.custoVeiculoRateado) === 5000,
+    'a soma dos rateios reconstrói o custo do caminhão',
+    arredondar(f1.custoVeiculoRateado + f2.custoVeiculoRateado) === 5000,
   )
   checar(
-    'resultado do frete maior',
-    f1.resultado === arredondar(10000 - 3400 - 3333.33),
+    'resultado do frete maior, antes do diesel',
+    f1.resultado === arredondar(10000 - 1400 - 3333.33),
     `R$ ${f1.resultado}`,
   )
   checar(
@@ -232,10 +240,13 @@ async function main() {
     'e sua receita é só a comissão e o seguro',
     fAgregado.receita === 1040 && fAgregado.resultado === 1040,
   )
+  // A diferença entre as duas telas é exatamente o combustível, e é a única.
+  // Se um dia deixar de ser, é porque alguma outra coisa saiu do rateio sem
+  // ninguém dizer.
   checar(
-    'soma dos resultados por frete reconstrói o resultado da frota',
-    arredondar(f1.resultado + f2.resultado) === r.propria.resultado,
-    `R$ ${arredondar(f1.resultado + f2.resultado)} = R$ ${r.propria.resultado}`,
+    'a soma por frete supera o resultado da frota exatamente pelo diesel',
+    arredondar(f1.resultado + f2.resultado) - 3000 === r.propria.resultado,
+    `R$ ${arredondar(f1.resultado + f2.resultado)} − 3.000 = R$ ${r.propria.resultado}`,
   )
 
 
@@ -292,16 +303,18 @@ async function main() {
   const porFreteSolto = await calcularResultadoPorFrete(inicio, fim)
   const s1 = porFreteSolto.find((f) => f.numeroCte === '1001')!
   const s2 = porFreteSolto.find((f) => f.numeroCte === '1002')!
+  // O diesel avulso é diesel: não entra aqui nem quando sabe de qual caminhão
+  // é. Se entrasse, a tela diria "antes do combustível" e mostraria uma parte
+  // dele — o pior dos dois mundos.
   checar(
-    'no rateio por frete o diesel avulso segue o km do caminhão',
-    s1.custoDiretoRateado === 4000 && s2.custoDiretoRateado === 2000,
-    `R$ ${s1.custoDiretoRateado} e R$ ${s2.custoDiretoRateado} de R$ 6.000`,
+    'diesel avulso também fica fora do rateio por frete',
+    s1.custoDiretoRateado === 1400 && s2.custoDiretoRateado === 700,
+    `R$ ${s1.custoDiretoRateado} e R$ ${s2.custoDiretoRateado}, os mesmos de antes do diesel avulso`,
   )
   checar(
-    'e a soma por frete só não fecha pelo que não tem dono — de propósito',
-    arredondar(s1.resultado + s2.resultado) - comOrfao.custoDiretoSemViagem ===
-      comOrfao.propria.resultado,
-    `R$ ${arredondar(s1.resultado + s2.resultado)} − R$ ${comOrfao.custoDiretoSemViagem}`,
+    'e a diferença para o resultado da frota é todo o combustível do mês',
+    arredondar(s1.resultado + s2.resultado) - 4000 === comOrfao.propria.resultado,
+    `R$ ${arredondar(s1.resultado + s2.resultado)} − 4.000 (3.000 na viagem + 900 do caminhão + 100 sem dono) = R$ ${comOrfao.propria.resultado}`,
   )
 
   // --- Frete cancelado ------------------------------------------------------

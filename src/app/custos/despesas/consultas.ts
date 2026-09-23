@@ -27,6 +27,7 @@ export async function opcoesDaDespesa() {
     // Viagens recentes bastam: pedágio de viagem de seis meses atrás não se
     // lança hoje, e uma lista com tudo não rola no celular.
     prisma.viagem.findMany({
+      where: { excluidaEm: null },
       orderBy: { dataSaida: 'desc' },
       take: 40,
       select: {

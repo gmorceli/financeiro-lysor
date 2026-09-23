@@ -78,7 +78,9 @@ export async function calcularAcertoMotorista(
       status: { not: 'CANCELADO' },
       acertoMotoristaId: null,
       dataEmissao: { gte: inicio, lte: fim },
-      viagem: { motoristaId },
+      // Viagem excluída não paga comissão: os fretes dela já caem pelo status,
+      // e o filtro explícito impede que uma restauração parcial vaze para cá.
+      viagem: { motoristaId, excluidaEm: null },
     },
     select: {
       id: true,

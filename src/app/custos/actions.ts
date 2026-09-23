@@ -55,9 +55,9 @@ export async function salvarAbastecimento(
         dados: {
           ...dados,
           valorLitro: dados.valorTotal / dados.litros,
-          viagemId: dados.viagemId ?? null,
           motoristaId: dados.motoristaId ?? null,
-          fornecedorId: dados.fornecedorId ?? null,
+          odometro: dados.odometro ?? null,
+          numeroNota: dados.numeroNota ?? null,
           dataVencimento: dados.dataVencimento ?? null,
           observacoes: dados.observacoes ?? null,
         },
@@ -69,9 +69,8 @@ export async function salvarAbastecimento(
   }
 
   revalidatePath('/custos/abastecimentos')
-  if (dados.viagemId) revalidatePath(`/viagens/${dados.viagemId}`)
   revalidatePath('/financeiro')
-  redirect(rota(dados.viagemId ? `/viagens/${dados.viagemId}` : '/custos/abastecimentos'))
+  redirect(rota('/custos/abastecimentos'))
 }
 
 export async function excluirAbastecimento(id: string): Promise<EstadoFormulario> {

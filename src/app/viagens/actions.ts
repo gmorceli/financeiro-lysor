@@ -8,6 +8,13 @@ import { calcularKm } from '@/lib/calculos'
 import { rota } from '@/lib/utils'
 import { traduzirErroPrisma, validarFormulario, type EstadoFormulario } from '@/lib/acoes'
 import { exigirAcesso } from '@/lib/sessao'
+import {
+  excluirViagemLogicamente,
+  MOTIVOS_EXCLUSAO,
+  restaurarViagem,
+  type DestinoDespesas,
+  type MotivoExclusao,
+} from '@/lib/viagens'
 
 export async function criarViagem(
   _estado: EstadoFormulario,
@@ -154,11 +161,98 @@ export async function reabrirViagem(id: string): Promise<EstadoFormulario> {
           'Os fretes desta viagem já entraram num acerto de motorista. Refaça o acerto antes de reabrir.',
       }
     }
+    const viagem = await prisma.viagem.findUnique({
+      where: { id },
+      select: { excluidaEm: true },
+    })
+    if (!viagem) return { erroGeral: 'Viagem não encontrada.' }
+    if (viagem.excluidaEm) {
+      return { erroGeral: 'Esta viagem foi excluída. Restaure antes de reabrir.' }
+    }
     await prisma.viagem.update({ where: { id }, data: { status: 'EM_ANDAMENTO' } })
   } catch (erro) {
     return traduzirErroPrisma(erro)
   }
   revalidatePath(`/viagens/${id}`)
   revalidatePath('/viagens')
+  return { ok: true }
+}
+
+/**
+ * Exclui a viagem lançada por engano.
+ *
+ * Exige o motivo porque a exclusão é irreversível na prática, mesmo sendo
+ * reversível no banco: quem restaura três semanas depois não lembra por que
+ * excluiu, e o motivo é a única coisa que responde isso. "Outro" pede texto
+ * pelo mesmo motivo — uma lista de quatro opções nunca cobre tudo, e a opção
+ * de escape sem explicação vira o atalho que todo mundo escolhe.
+ */
+export async function excluirViagem(
+  _estado: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const usuario = await exigirAcesso('operacao')
+
+  const id = formData.get('id')?.toString()
+  if (!id) return { erroGeral: 'Viagem não identificada.' }
+
+  const escolha = formData.get('motivo')?.toString() as MotivoExclusao | undefined
+  if (!escolha || !(escolha in MOTIVOS_EXCLUSAO)) {
+    return {
+      erroGeral: 'Confira os campos destacados.',
+      errosPorCampo: { motivo: ['Diga por que está excluindo'] },
+    }
+  }
+
+  const detalhe = formData.get('motivoTexto')?.toString().trim() ?? ''
+  if (escolha === 'OUTRO' && detalhe === '') {
+    return {
+      erroGeral: 'Confira os campos destacados.',
+      errosPorCampo: { motivoTexto: ['Escreva o motivo'] },
+    }
+  }
+
+  const motivo =
+    escolha === 'OUTRO' ? detalhe : detalhe ? `${MOTIVOS_EXCLUSAO[escolha]} — ${detalhe}` : MOTIVOS_EXCLUSAO[escolha]
+
+  const despesas = (formData.get('despesas')?.toString() ?? 'manter') as DestinoDespesas
+
+  try {
+    await prisma.$transaction((tx) =>
+      excluirViagemLogicamente(tx, id, { motivo, usuario: usuario.nome, despesas }),
+    )
+  } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
+    return traduzirErroPrisma(erro)
+  }
+
+  revalidatePath('/viagens')
+  revalidatePath(`/viagens/${id}`)
+  revalidatePath('/fretes')
+  revalidatePath('/financeiro')
+  revalidatePath('/relatorios')
+  revalidatePath('/')
+  // Redireciona no servidor, e não pelo `ok` do formulário: a própria tela de
+  // exclusão se redesenha assim que a viagem sai, e por um instante ela dizia
+  // "esta viagem já foi excluída" — o que, logo depois de confirmar, lê como
+  // erro. A lista é o lugar certo para cair.
+  redirect(rota('/viagens'))
+}
+
+/** Desfaz a exclusão, para quando o clique caiu na linha de cima. */
+export async function restaurarViagemExcluida(id: string): Promise<EstadoFormulario> {
+  await exigirAcesso('operacao')
+  try {
+    await prisma.$transaction((tx) => restaurarViagem(tx, id))
+  } catch (erro) {
+    if (erro instanceof Error && !('code' in erro)) return { erroGeral: erro.message }
+    return traduzirErroPrisma(erro)
+  }
+  revalidatePath('/viagens')
+  revalidatePath(`/viagens/${id}`)
+  revalidatePath('/fretes')
+  revalidatePath('/financeiro')
+  revalidatePath('/relatorios')
+  revalidatePath('/')
   return { ok: true }
 }

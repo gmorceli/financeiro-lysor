@@ -19,6 +19,7 @@ export type AbastecimentoExistente = {
   litros: string
   valorTotal: string
   odometro: string
+  numeroNota: string
   tanqueCheio: boolean
   formaPagamento: string
   dataVencimento: string
@@ -29,7 +30,7 @@ export type VeiculoAbastecimento = {
   id: string
   apelido: string
   odometroAtual: number | null
-  /** Odômetro e litros do último abastecimento de tanque cheio, se houver. */
+  /** Odômetro do último abastecimento de tanque cheio com km anotado. */
   ultimoTanqueCheio: { odometro: number } | null
 }
 
@@ -40,31 +41,28 @@ export type VeiculoAbastecimento = {
  * motorista, esta tela é a única fonte do maior custo variável da operação —
  * por isso é a mais enxuta do sistema e a mais preparada para o celular.
  *
- * O consumo aparece assim que litros e odômetro são preenchidos, o que dá ao
- * operador uma chance de perceber o erro de digitação na hora: 1,8 km/l salta
- * aos olhos de quem conhece a frota.
+ * O abastecimento é do **caminhão**, não da viagem. Um tanque cheio atende
+ * várias viagens; escolher uma delas jogava o diesel inteiro na primeira que o
+ * motorista anotou, e o lucro das outras saía alto pelo motivo errado. O custo
+ * entra no fechamento do caminhão no mês, valor exato e sem rateio.
+ *
+ * O preço do litro aparece assim que litros e valor são preenchidos, e o km/l
+ * quando há km anterior. É a chance de perceber o erro de digitação na hora:
+ * 1,8 km/l salta aos olhos de quem conhece a frota.
  */
 export function FormularioAbastecimento({
   veiculos,
   motoristas,
   fornecedores,
-  viagemId,
-  veiculoFixoId,
-  motoristaSugeridoId,
   abastecimento,
 }: {
   veiculos: VeiculoAbastecimento[]
   motoristas: Array<{ id: string; nome: string }>
   fornecedores: Array<{ id: string; nome: string }>
-  viagemId?: string
-  veiculoFixoId?: string
-  motoristaSugeridoId?: string
   /** Presente só na correção de um abastecimento já lançado. */
   abastecimento?: AbastecimentoExistente
 }) {
-  const [veiculoId, setVeiculoId] = useState(
-    abastecimento?.veiculoId ?? veiculoFixoId ?? '',
-  )
+  const [veiculoId, setVeiculoId] = useState(abastecimento?.veiculoId ?? '')
   const [litros, setLitros] = useState(abastecimento?.litros ?? '')
   const [valorTotal, setValorTotal] = useState(abastecimento?.valorTotal ?? '')
   const [odometro, setOdometro] = useState(abastecimento?.odometro ?? '')
@@ -95,7 +93,6 @@ export function FormularioAbastecimento({
       {(erros) => (
         <>
           {abastecimento && <input type="hidden" name="id" value={abastecimento.id} />}
-          {viagemId && <input type="hidden" name="viagemId" value={viagemId} />}
 
           <Card className="grid gap-4 p-4 sm:grid-cols-2">
             <Campo label="Caminhão" obrigatorio erro={erros.veiculoId}>
@@ -104,8 +101,7 @@ export function FormularioAbastecimento({
                 value={veiculoId}
                 onChange={(e) => setVeiculoId(e.target.value)}
                 required
-                disabled={!!veiculoFixoId}
-                autoFocus={!veiculoFixoId}
+                autoFocus
               >
                 <option value="">Selecione…</option>
                 {veiculos.map((v) => (
@@ -114,7 +110,6 @@ export function FormularioAbastecimento({
                   </option>
                 ))}
               </Select>
-              {veiculoFixoId && <input type="hidden" name="veiculoId" value={veiculoFixoId} />}
             </Campo>
 
             <Campo label="Data" obrigatorio erro={erros.data}>
@@ -128,11 +123,10 @@ export function FormularioAbastecimento({
 
             <Campo
               label="Km do painel"
-              obrigatorio
               dica={
                 veiculo?.odometroAtual != null
-                  ? `Última leitura: ${formatarNumero(veiculo.odometroAtual)} km`
-                  : 'O que está marcando no painel agora.'
+                  ? `Última leitura: ${formatarNumero(veiculo.odometroAtual)} km. Em branco se o motorista não anotou.`
+                  : 'Conforme a anotação do motorista. Pode ficar em branco.'
               }
               erro={erros.odometro}
             >
@@ -142,8 +136,6 @@ export function FormularioAbastecimento({
                 inputMode="numeric"
                 value={odometro}
                 onChange={(e) => setOdometro(e.target.value)}
-                required
-                autoFocus={!!veiculoFixoId}
               />
             </Campo>
 
@@ -171,9 +163,18 @@ export function FormularioAbastecimento({
               />
             </Campo>
 
-            <Campo label="Posto" erro={erros.fornecedorId}>
-              <Select name="fornecedorId" defaultValue={abastecimento?.fornecedorId ?? ''}>
-                <option value="">Não informado</option>
+            <Campo
+              label="Posto"
+              obrigatorio
+              dica="É por ele que a fatura do fim do mês encontra este abastecimento."
+              erro={erros.fornecedorId}
+            >
+              <Select
+                name="fornecedorId"
+                defaultValue={abastecimento?.fornecedorId ?? ''}
+                required
+              >
+                <option value="">Selecione…</option>
                 {fornecedores.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.nome}
@@ -182,10 +183,18 @@ export function FormularioAbastecimento({
               </Select>
             </Campo>
 
+            <Campo
+              label="Nº da nota ou fatura"
+              dica="O posto fatura sem detalhamento; o número ajuda a conferir depois."
+              erro={erros.numeroNota}
+            >
+              <Input name="numeroNota" defaultValue={abastecimento?.numeroNota} />
+            </Campo>
+
             <Campo label="Motorista" erro={erros.motoristaId}>
               <Select
                 name="motoristaId"
-                defaultValue={abastecimento?.motoristaId ?? motoristaSugeridoId ?? ''}
+                defaultValue={abastecimento?.motoristaId ?? ''}
               >
                 <option value="">Não informado</option>
                 {motoristas.map((m) => (
@@ -229,6 +238,12 @@ export function FormularioAbastecimento({
                     <strong>{consumo.toFixed(2).replace('.', ',')} km/l</strong>
                   </p>
                 )}
+                {consumo === null && odometro === '' && (
+                  <p className="mt-1 text-texto-suave">
+                    Sem o km do painel não dá para calcular o km/l deste intervalo. O
+                    custo entra igual.
+                  </p>
+                )}
               </div>
             )}
           </Card>
@@ -239,7 +254,7 @@ export function FormularioAbastecimento({
                 name="formaPagamento"
                 defaultValue={abastecimento?.formaPagamento ?? 'BOLETO'}
               >
-                <option value="BOLETO">Boleto / faturado</option>
+                <option value="BOLETO">Faturado no posto</option>
                 <option value="PIX">Pix</option>
                 <option value="DINHEIRO">Dinheiro</option>
                 <option value="CARTAO">Cartão</option>
@@ -250,7 +265,7 @@ export function FormularioAbastecimento({
 
             <Campo
               label="Vencimento"
-              dica="Deixe em branco se pagou na hora."
+              dica="Faturado: a data da fatura do posto. Em branco se pagou na hora."
               erro={erros.dataVencimento}
             >
               <Input

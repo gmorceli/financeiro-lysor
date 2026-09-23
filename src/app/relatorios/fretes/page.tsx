@@ -40,7 +40,7 @@ export default async function ResultadoPorFrete({
     <>
       <CabecalhoPagina
         titulo="Resultado por frete"
-        descricao="Diesel e pedágio são da viagem — aqui aparecem rateados por frete, na proporção da receita."
+        descricao="Antes do combustível. Pedágio e comissão são rateados por frete, na proporção da receita."
         acao={
           <div className="flex flex-wrap items-center gap-2">
             <SeletorMes valor={valorSeletor} />
@@ -66,9 +66,9 @@ export default async function ResultadoPorFrete({
                 <Th>Rota</Th>
                 <Th>Quem rodou</Th>
                 <Th className="text-right">Receita</Th>
-                <Th className="text-right">Custo direto</Th>
+                <Th className="text-right">Pedágio e comissão</Th>
                 <Th className="text-right">Custo do caminhão</Th>
-                <Th className="text-right">Resultado</Th>
+                <Th className="text-right">Antes do diesel</Th>
               </tr>
             </thead>
             <tbody>
@@ -142,6 +142,20 @@ export default async function ResultadoPorFrete({
       </Card>
 
       <p className="mt-4 text-sm text-texto-suave">
+        <strong className="font-medium text-texto">O diesel não entra aqui.</strong> Um
+        tanque cheio atende várias viagens, e dividi-lo entre elas seria chute com cara
+        de número exato. O combustível aparece inteiro, pelo valor real, no{' '}
+        <Link
+          href={`/relatorios?mes=${valorSeletor}`}
+          className="-my-3 inline-flex min-h-11 items-center font-medium text-primaria underline sm:my-0 sm:min-h-0"
+        >
+          resultado por caminhão
+        </Link>{' '}
+        do mês. Use esta tela para comparar fretes entre si — quem paga melhor pelo
+        pedágio e pela comissão que exige.
+      </p>
+
+      <p className="mt-3 text-sm text-texto-suave">
         Frete de agregado não tem custo rateado: o caminhão é dele, e a receita da Lysor
         é só a comissão e o seguro. O custo fixo da empresa não entra nesta tela — ele
         aparece só no resultado do mês.

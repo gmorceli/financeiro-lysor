@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { ultimoComKm } from '@/lib/calculos'
 import { CabecalhoPagina, Card } from '@/components/ui'
 import { FormularioAbastecimento } from '../../formulario-abastecimento'
 import { ExcluirAbastecimento } from './excluir'
@@ -49,7 +50,11 @@ export default async function CorrigirAbastecimento({
     prisma.veiculo.findMany({
       where: {
         OR: [
-          { status: { in: ['ATIVO', 'MANUTENCAO'] }, tipo: { in: ['CAVALO', 'TRUCK'] } },
+          {
+            status: { in: ['ATIVO', 'MANUTENCAO'] },
+            tipo: { in: ['CAVALO', 'TRUCK'] },
+            tipoPosse: 'PROPRIO',
+          },
           { id: abastecimento.veiculoId },
         ],
       },
@@ -60,7 +65,7 @@ export default async function CorrigirAbastecimento({
         abastecimentos: {
           // O próprio abastecimento fica de fora da referência de consumo: ele
           // é o que está sendo corrigido, não a leitura anterior a ele.
-          where: { tanqueCheio: true, id: { not: id } },
+          where: { tanqueCheio: true, id: { not: id }, odometro: { not: null } },
           orderBy: { odometro: 'desc' },
           take: 1,
           select: { odometro: true },
@@ -114,11 +119,10 @@ export default async function CorrigirAbastecimento({
             id: v.id,
             apelido: v.apelido,
             odometroAtual: v.odometroAtual,
-            ultimoTanqueCheio: v.abastecimentos[0] ?? null,
+            ultimoTanqueCheio: ultimoComKm(v.abastecimentos),
           }))}
           motoristas={motoristas}
           fornecedores={fornecedores}
-          viagemId={abastecimento.viagemId ?? undefined}
           abastecimento={{
             id: abastecimento.id,
             veiculoId: abastecimento.veiculoId,
@@ -128,6 +132,7 @@ export default async function CorrigirAbastecimento({
             litros: texto(abastecimento.litros),
             valorTotal: texto(abastecimento.valorTotal),
             odometro: texto(abastecimento.odometro),
+            numeroNota: texto(abastecimento.numeroNota),
             tanqueCheio: abastecimento.tanqueCheio,
             formaPagamento: abastecimento.lancamento?.formaPagamento ?? 'BOLETO',
             dataVencimento: dia(abastecimento.lancamento?.dataVencimento ?? null),

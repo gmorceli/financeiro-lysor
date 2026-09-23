@@ -425,8 +425,17 @@ model Viagem {
   destino             String
   status              StatusViagem @default(PLANEJADA)
   observacoes         String?
-  criadoEm            DateTime     @default(now())
-  atualizadoEm        DateTime     @updatedAt
+
+  /// Exclusão lógica. Uma viagem lançada por engano some das listas, dos
+  /// fechamentos, do contas a receber e de todas as camadas do DRE — mas o
+  /// registro fica, com quem excluiu e por quê, e dá para restaurar. Apagar de
+  /// verdade destruiria o rastro de um CT-e que existiu no mundo.
+  excluidaEm     DateTime?
+  excluidaPor    String?
+  motivoExclusao String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
   veiculo        Veiculo         @relation(fields: [veiculoId], references: [id])
   motorista      Motorista       @relation(fields: [motoristaId], references: [id])
@@ -483,12 +492,16 @@ model Frete {
   dataColeta  DateTime? @db.Date
   dataEntrega DateTime? @db.Date
 
-  faturaId     String?
-  status       StatusFrete @default(ABERTO)
-  observacoes  String?
-  origemDado   OrigemDado  @default(MANUAL)
-  criadoEm     DateTime    @default(now())
-  atualizadoEm DateTime    @updatedAt
+  faturaId           String?
+  status             StatusFrete @default(ABERTO)
+  /// Cancelado por arrasto, quando a viagem inteira foi excluída — e não por si
+  /// mesmo. É o que permite restaurar a viagem sem ressuscitar um CT-e que a
+  /// cliente tinha cancelado antes, por outro motivo.
+  canceladoComViagem Boolean     @default(false)
+  observacoes        String?
+  origemDado         OrigemDado  @default(MANUAL)
+  criadoEm           DateTime    @default(now())
+  atualizadoEm       DateTime    @updatedAt
 
   /// Preenchido quando a comissão deste frete entrou num acerto fechado.
   ///
@@ -524,7 +537,11 @@ model Abastecimento {
   litros       Decimal    @db.Decimal(10, 3)
   valorLitro   Decimal    @db.Decimal(10, 4)
   valorTotal   Decimal    @db.Decimal(14, 2)
-  odometro     Int
+  /// Anotação do motorista, que nem sempre chega. Sem ela o abastecimento
+  /// continua valendo como custo; só não entra no cálculo de km/l.
+  odometro     Int?
+  /// Nota ou fatura do posto. O posto fatura sem detalhamento por veículo.
+  numeroNota   String?
   /// km/l só fecha entre dois abastecimentos de tanque cheio.
   tanqueCheio  Boolean    @default(true)
   origemDado   OrigemDado @default(MANUAL)

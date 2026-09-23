@@ -293,16 +293,18 @@ export type FreteAgregadoInput = z.infer<typeof freteAgregadoSchema>
 export const abastecimentoSchema = z
   .object({
     veiculoId: z.string().trim().min(1, 'Escolha o caminhão'),
-    viagemId: textoOpcional,
     motoristaId: textoOpcional,
-    fornecedorId: textoOpcional,
+    // O posto é obrigatório: é o que liga o abastecimento à fatura que chega no
+    // fim do mês, e sem ele o contas a pagar não sabe de quem é a conta.
+    fornecedorId: z.string().trim().min(1, 'Escolha o posto'),
     data: dataObrigatoria,
     litros: numeroObrigatorio('os litros').refine((v) => v > 0, 'Precisa ser maior que zero'),
     valorTotal: numeroObrigatorio('o valor pago').refine((v) => v > 0, 'Precisa ser maior que zero'),
-    odometro: numeroObrigatorio('a quilometragem do painel').refine(
-      (v) => v >= 0,
-      'Não pode ser negativa',
-    ),
+    // O km vem da anotação do motorista e nem sempre chega. Sem ele o custo
+    // continua valendo; só o km/l daquele intervalo deixa de fechar. Exigir o
+    // que não existe empurraria a pessoa a inventar um número.
+    odometro: decimalOpcional,
+    numeroNota: textoOpcional,
     tanqueCheio: booleanoFormulario,
     formaPagamento: z.enum([
       'DINHEIRO',

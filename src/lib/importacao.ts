@@ -223,7 +223,9 @@ export async function importarLinha(
       select: { odometroAtual: true },
     }),
     tx.viagem.findFirst({
-      where: { veiculoId: linha.veiculoId! },
+      // Viagem excluída não ancora quilometragem: o km dela pode ser justamente
+      // o erro que levou à exclusão.
+      where: { veiculoId: linha.veiculoId!, excluidaEm: null },
       orderBy: { dataSaida: 'desc' },
       select: { kmInicial: true, kmFinal: true },
     }),
