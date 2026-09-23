@@ -1,20 +1,27 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { Button, CabecalhoPagina, Card, EstadoVazio } from '@/components/ui'
+import { ultimoComKm } from '@/lib/calculos'
 import { FormularioAbastecimento } from '../../formulario-abastecimento'
 
 export const dynamic = 'force-dynamic'
 
 export default async function NovoAbastecimento() {
   const [veiculos, motoristas, fornecedores] = await Promise.all([
+    // Só caminhão da Lysor: o agregado paga o próprio diesel, e oferecê-lo aqui
+    // criaria uma despesa que não é da empresa.
     prisma.veiculo.findMany({
-      where: { status: { in: ['ATIVO', 'MANUTENCAO'] }, tipo: { in: ['CAVALO', 'TRUCK'] } },
+      where: {
+        status: { in: ['ATIVO', 'MANUTENCAO'] },
+        tipo: { in: ['CAVALO', 'TRUCK'] },
+        tipoPosse: 'PROPRIO',
+      },
       select: {
         id: true,
         apelido: true,
         odometroAtual: true,
         abastecimentos: {
-          where: { tanqueCheio: true },
+          where: { tanqueCheio: true, odometro: { not: null } },
           orderBy: { odometro: 'desc' },
           take: 1,
           select: { odometro: true },
@@ -40,8 +47,8 @@ export default async function NovoAbastecimento() {
         <CabecalhoPagina titulo="Lançar abastecimento" />
         <Card>
           <EstadoVazio
-            titulo="Nenhum caminhão cadastrado"
-            descricao="Cadastre o caminhão antes de lançar abastecimento."
+            titulo="Nenhum caminhão próprio cadastrado"
+            descricao="Abastecimento é custo de caminhão da Lysor — o agregado paga o próprio diesel. Cadastre o caminhão antes de lançar."
             acao={
               <Link href="/cadastros/veiculos/novo">
                 <Button>Cadastrar caminhão</Button>
@@ -61,7 +68,7 @@ export default async function NovoAbastecimento() {
           id: v.id,
           apelido: v.apelido,
           odometroAtual: v.odometroAtual,
-          ultimoTanqueCheio: v.abastecimentos[0] ?? null,
+          ultimoTanqueCheio: ultimoComKm(v.abastecimentos),
         }))}
         motoristas={motoristas}
         fornecedores={fornecedores}

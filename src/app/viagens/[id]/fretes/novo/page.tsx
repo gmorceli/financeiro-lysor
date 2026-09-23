@@ -20,6 +20,7 @@ export default async function NovoFreteDaViagem({
         numero: true,
         origem: true,
         destino: true,
+        excluidaEm: true,
         veiculo: { select: { apelido: true } },
       },
     }),
@@ -30,7 +31,7 @@ export default async function NovoFreteDaViagem({
     }),
   ])
 
-  if (!viagem) notFound()
+  if (!viagem || viagem.excluidaEm) notFound()
 
   if (clientes.length === 0) {
     return (

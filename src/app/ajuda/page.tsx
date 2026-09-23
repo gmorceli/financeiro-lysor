@@ -43,7 +43,7 @@ const ONDE_LANCAR = [
     gasto: 'Diesel',
     tela: 'Abastecimentos',
     href: '/custos/abastecimentos/novo',
-    porque: 'Precisa dos litros e do km do painel para calcular o km/l.',
+    porque: 'O abastecimento é do caminhão, não da viagem — um tanque atende várias.',
   },
   {
     gasto: 'Oficina, peça, mão de obra, pneu',
@@ -55,7 +55,7 @@ const ONDE_LANCAR = [
     gasto: 'Pedágio, chapa, lavagem, alimentação',
     tela: 'Despesas',
     href: '/custos/despesas/nova',
-    porque: 'Escolha o tipo em “Custo da viagem” e marque a viagem.',
+    porque: 'Escolha o tipo em “Custo da viagem” e marque a viagem. Diesel não vai aqui.',
   },
   {
     gasto: 'Seguro, IPVA, licenciamento, rastreador, parcela',
@@ -140,16 +140,90 @@ export default async function Ajuda() {
         </Tabela>
         <p className="border-t border-borda px-4 py-3 text-xs text-texto-suave">
           Atalho: pedágio, chapa e lavagem de uma viagem específica também podem ser
-          lançados de dentro da própria viagem, no botão Despesa. Dá no mesmo — é só
-          menos cliques quando você já está com a viagem aberta.
+          lançados de dentro da própria viagem, no botão Lançar despesa. Dá no mesmo — é
+          só menos cliques quando você já está com a viagem aberta. O diesel é a exceção:
+          ele não tem botão dentro da viagem, e é de propósito.
         </p>
+      </Card>
+
+      <Card className="mb-4 p-4">
+        <h2 className="text-sm font-semibold text-texto">
+          Por que o diesel não entra na viagem
+        </h2>
+        <div className="mt-2 flex flex-col gap-2 text-sm text-texto-suave">
+          <p>
+            Um tanque cheio roda duas, três viagens. Escolher uma delas jogava o diesel
+            inteiro na primeira que o motorista anotou — aquela viagem aparecia no
+            prejuízo e as outras, lucrando lindamente. Nenhum dos dois números era
+            verdade.
+          </p>
+          <p>
+            Agora o abastecimento é lançado em{' '}
+            <Link
+              href={rota('/custos/abastecimentos/novo')}
+              className="-my-3 inline-flex min-h-11 items-center font-medium text-primaria hover:underline sm:my-0 sm:min-h-0"
+            >
+              Custos → Abastecimentos
+            </Link>
+            , amarrado ao caminhão. Ele entra pelo valor exato no resultado daquele
+            caminhão no mês, sem divisão nenhuma.
+          </p>
+          <p>
+            O <strong className="font-medium text-texto">resultado por frete</strong>{' '}
+            passou a mostrar o lucro <em>antes do diesel</em>: frete menos pedágio, menos
+            despesa de estrada, menos comissão. Serve para comparar fretes entre si. Para
+            saber se o caminhão está se pagando, é o relatório por caminhão do mês.
+          </p>
+          <p>
+            O km do painel virou opcional — lance mesmo quando o motorista não anotou. Só
+            o km/l daquele intervalo deixa de fechar; o custo entra igual.
+          </p>
+        </div>
+      </Card>
+
+      <Card className="mb-4 p-4">
+        <h2 className="text-sm font-semibold text-texto">Viagem lançada por engano</h2>
+        <div className="mt-2 flex flex-col gap-2 text-sm text-texto-suave">
+          <p>
+            Na lista de{' '}
+            <Link
+              href={rota('/viagens')}
+              className="-my-3 inline-flex min-h-11 items-center font-medium text-primaria hover:underline sm:my-0 sm:min-h-0"
+            >
+              Viagens
+            </Link>
+            , cada linha tem <strong className="font-medium text-texto">Excluir</strong> na
+            ponta direita. A tela seguinte mostra data, CT-e, motorista, placa, rota e
+            valor antes de confirmar — confira se é essa mesmo, porque o erro comum não é
+            excluir sem querer, é excluir a linha de cima.
+          </p>
+          <p>
+            A viagem some das listas, dos relatórios de lucro, do contas a receber e do
+            cálculo de comissão. Mas não é apagada: fica registrada com a data, o seu nome
+            e o motivo, e o botão{' '}
+            <strong className="font-medium text-texto">Mostrar excluídas</strong> no topo
+            da lista devolve todas, com{' '}
+            <strong className="font-medium text-texto">Restaurar</strong> em cada uma.
+          </p>
+          <p>
+            Se já havia recebimento lançado, ele é estornado junto, e a tela avisa antes.
+            Se havia pedágio ou outra despesa na viagem, você escolhe: manter como custo
+            do caminhão (o padrão — o dinheiro saiu mesmo) ou excluir junto, quando a
+            viagem inteira era duplicata.
+          </p>
+          <p>
+            Uma viagem cuja comissão já foi paga num acerto fechado não exclui. Refaça o
+            acerto primeiro — senão fica um pagamento ao motorista sem frete que o
+            justifique.
+          </p>
+        </div>
       </Card>
 
       <Card className="p-4">
         <h2 className="text-sm font-semibold text-texto">Errou? Nada fica travado</h2>
         <div className="mt-2 flex flex-col gap-2 text-sm text-texto-suave">
           <p>
-            Frete, viagem, abastecimento, manutenção e despesa: cada linha da lista tem um{' '}
+            Frete, abastecimento, manutenção e despesa: cada linha da lista tem um{' '}
             <strong className="font-medium text-texto">Corrigir</strong> na ponta direita.
             Dentro da tela de correção há também o botão de excluir.
           </p>

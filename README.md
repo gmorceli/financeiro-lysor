@@ -99,12 +99,13 @@ senha, essa porta fecha para sempre e trocar e-mail passa a ser pela tela.
 Variáveis necessárias: `DATABASE_URL` e `DIRECT_URL`. Depois do primeiro acesso,
 remova `ADMIN_SENHA` do painel: ela não serve mais para nada.
 
-Verificações — **262 asserções contra um Postgres de verdade**:
+Verificações — **334 asserções contra um Postgres de verdade**:
 
 ```bash
 npm run typecheck         # tipos
 npm run verificar         # regras de validação dos cadastros
 npm run verificar:fluxo   # fluxo operacional contra o banco
+npm run verificar:viagens # exclusão e restauração de viagem, com todo o arrasto
 npm run verificar:custos  # custos, títulos e margem contra o banco
 npm run verificar:financeiro  # títulos, baixas e o gatilho ao-receber
 npm run verificar:resultado   # cascata do DRE e rateio por frete

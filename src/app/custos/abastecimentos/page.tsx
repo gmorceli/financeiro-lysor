@@ -29,14 +29,16 @@ export default async function ListaAbastecimentos() {
       fornecedor: { select: { nome: true } },
       motorista: { select: { nome: true } },
     },
-    orderBy: [{ data: 'desc' }, { odometro: 'desc' }],
+    orderBy: [{ data: 'desc' }, { criadoEm: 'desc' }],
     take: 200,
   })
 
   // Para cada veículo, o abastecimento de tanque cheio imediatamente anterior.
+  // Só entram os que têm km anotado: o km virou opcional, e um registro sem km
+  // não fecha intervalo de consumo nem pode servir de leitura anterior.
   const anteriorPorVeiculo = new Map<string, { odometro: number }>()
   const cronologico = [...abastecimentos].sort(
-    (a, b) => a.odometro - b.odometro || a.data.getTime() - b.data.getTime(),
+    (a, b) => a.data.getTime() - b.data.getTime() || (a.odometro ?? 0) - (b.odometro ?? 0),
   )
   const consumoPorId = new Map<string, number | null>()
 
@@ -44,24 +46,56 @@ export default async function ListaAbastecimentos() {
     const anterior = anteriorPorVeiculo.get(a.veiculoId)
     consumoPorId.set(
       a.id,
-      a.tanqueCheio && anterior
+      a.tanqueCheio && anterior && a.odometro != null
         ? calcularConsumo(anterior.odometro, a.odometro, Number(a.litros))
         : null,
     )
-    if (a.tanqueCheio) anteriorPorVeiculo.set(a.veiculoId, { odometro: a.odometro })
+    if (a.tanqueCheio && a.odometro != null) {
+      anteriorPorVeiculo.set(a.veiculoId, { odometro: a.odometro })
+    }
   }
+
+  // Suspeita de duplicidade: mesmo caminhão, mesmo dia, mesmo valor.
+  //
+  // O abastecimento saiu de dentro da viagem, e os que já existiam foram
+  // convertidos em custo do caminhão. Se o mesmo tanque tinha sido lançado em
+  // duas viagens diferentes, a conversão deixou duas despesas iguais lado a
+  // lado — o diesel contado em dobro no fechamento do mês. O sistema não apaga
+  // sozinho porque abastecer duas vezes no mesmo posto no mesmo dia acontece;
+  // ele marca, e quem sabe decide.
+  const chaveDuplicidade = (a: (typeof abastecimentos)[number]) =>
+    `${a.veiculoId}|${a.data.toISOString().slice(0, 10)}|${Number(a.valorTotal).toFixed(2)}`
+  const vezes = new Map<string, number>()
+  for (const a of abastecimentos) {
+    const chave = chaveDuplicidade(a)
+    vezes.set(chave, (vezes.get(chave) ?? 0) + 1)
+  }
+  const suspeitos = abastecimentos.filter((a) => (vezes.get(chaveDuplicidade(a)) ?? 0) > 1)
+  const ehSuspeito = new Set(suspeitos.map((a) => a.id))
 
   return (
     <>
       <CabecalhoPagina
         titulo="Abastecimentos"
-        descricao="O maior custo variável da operação. O km/l sai daqui."
+        descricao="Custo do caminhão no mês, valor exato. O km/l sai daqui."
         acao={
           <Link href="/custos/abastecimentos/novo">
             <Button>Lançar abastecimento</Button>
           </Link>
         }
       />
+
+      {suspeitos.length > 0 && (
+        <Card className="mb-4 border-amber-200 bg-amber-50 p-4 text-sm text-texto">
+          <strong className="font-medium text-alerta">
+            {suspeitos.length} lançamentos parecem repetidos.
+          </strong>{' '}
+          Mesmo caminhão, mesmo dia e mesmo valor —{' '}
+          {[...new Set(suspeitos.map((a) => a.veiculo.apelido))].join(', ')}. Se for o
+          mesmo abastecimento lançado duas vezes, o diesel está contado em dobro no
+          fechamento do mês: abra e exclua um dos dois.
+        </Card>
+      )}
 
       <Card>
         {abastecimentos.length === 0 ? (
@@ -94,10 +128,17 @@ export default async function ListaAbastecimentos() {
                 const consumo = consumoPorId.get(a.id)
                 return (
                   <tr key={a.id} className="hover:bg-fundo">
-                    <Td className="tabular-nums text-texto-suave">{formatarData(a.data)}</Td>
+                    <Td className="tabular-nums text-texto-suave">
+                      {formatarData(a.data)}
+                      {ehSuspeito.has(a.id) && (
+                        <Badge className="ml-2" tom="alerta">
+                          repetido?
+                        </Badge>
+                      )}
+                    </Td>
                     <Td className="text-texto">{a.veiculo.apelido}</Td>
                     <Td className="text-right tabular-nums text-texto-suave">
-                      {formatarNumero(a.odometro)}
+                      {a.odometro == null ? '—' : formatarNumero(a.odometro)}
                     </Td>
                     <Td className="text-right tabular-nums text-texto-suave">
                       {formatarNumero(Number(a.litros), 1)}

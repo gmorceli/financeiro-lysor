@@ -14,7 +14,12 @@ export default async function NovaDespesaViagem({
   const [viagem, categorias, fornecedores] = await Promise.all([
     prisma.viagem.findUnique({
       where: { id },
-      select: { id: true, numero: true, veiculo: { select: { apelido: true } } },
+      select: {
+        id: true,
+        numero: true,
+        excluidaEm: true,
+        veiculo: { select: { apelido: true } },
+      },
     }),
     // Só o que é custo direto da viagem; combustível tem tela própria porque
     // precisa de litros e odômetro.
@@ -34,7 +39,7 @@ export default async function NovaDespesaViagem({
     }),
   ])
 
-  if (!viagem) notFound()
+  if (!viagem || viagem.excluidaEm) notFound()
 
   return (
     <>

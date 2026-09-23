@@ -2,7 +2,7 @@
   "name": "financeiro-lysor",
   "version": "0.1.0",
   "private": true,
-  "description": "Sistema de gest\u00e3o financeira e operacional da Lysor Transportes",
+  "description": "Sistema de gestão financeira e operacional da Lysor Transportes",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -19,6 +19,7 @@
     "usuario": "tsx scripts/criar-usuario.ts",
     "verificar": "tsx scripts/verificar-regras.ts",
     "verificar:fluxo": "tsx scripts/verificar-fluxo.ts",
+    "verificar:viagens": "tsx scripts/verificar-viagens.ts",
     "verificar:custos": "tsx scripts/verificar-custos.ts",
     "verificar:financeiro": "tsx scripts/verificar-financeiro.ts",
     "verificar:resultado": "tsx scripts/verificar-resultado.ts",

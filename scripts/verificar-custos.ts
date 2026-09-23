@@ -404,6 +404,13 @@ async function main() {
     where: { id: viagem.veiculoId },
     select: { apelido: true, tipo: true, odometroAtual: true },
   })
+  // O posto virou obrigatório: é por ele que a fatura do fim do mês encontra o
+  // abastecimento.
+  const posto = await prisma.fornecedor.upsert({
+    where: { id: `posto-${MARCA}` },
+    update: {},
+    create: { id: `posto-${MARCA}`, nome: `Posto ${MARCA}` },
+  })
   const tanque = await prisma.$transaction((tx) =>
     gravarAbastecimento(tx, {
       categoriaId: combustivel.id,
@@ -415,6 +422,7 @@ async function main() {
         valorTotal: 3000,
         valorLitro: 7.5,
         odometro: (veiculoDoTanque.odometroAtual ?? 0) + 500,
+        fornecedorId: posto.id,
         tanqueCheio: true,
         formaPagamento: 'PIX',
         observacoes: MARCA,
@@ -424,7 +432,9 @@ async function main() {
   const tituloDoTanque = async () =>
     (await prisma.abastecimento.findUniqueOrThrow({
       where: { id: tanque },
-      include: { lancamento: { select: { id: true, valor: true } } },
+      include: {
+        lancamento: { select: { id: true, valor: true, viagemId: true, veiculoId: true } },
+      },
     }))
 
   checar(
@@ -444,6 +454,7 @@ async function main() {
         valorTotal: 2250,
         valorLitro: 7.5,
         odometro: (veiculoDoTanque.odometroAtual ?? 0) + 500,
+        fornecedorId: posto.id,
         tanqueCheio: true,
         formaPagamento: 'PIX',
         observacoes: MARCA,
@@ -462,6 +473,63 @@ async function main() {
       where: { descricao: `Abastecimento — ${apelido}`, valor: new Prisma.Decimal(3000) },
     })) === 0,
   )
+
+  // O abastecimento saiu de dentro da viagem: um tanque cheio atende várias, e
+  // prendê-lo a uma delas jogava o diesel inteiro na primeira que o motorista
+  // anotou. `gravarAbastecimento` grava `viagemId: null` nos dois lados —
+  // abastecimento e título — mesmo que alguém passe uma viagem.
+  checar(
+    'o abastecimento não pertence a viagem nenhuma',
+    corrigido.viagemId === null && corrigido.lancamento?.viagemId === null,
+    `abastecimento ${corrigido.viagemId}, título ${corrigido.lancamento?.viagemId}`,
+  )
+  checar(
+    'e sabe de qual caminhão é, que é o que sustenta o fechamento do mês',
+    corrigido.lancamento?.veiculoId === viagem.veiculoId,
+  )
+
+  // O km vem da anotação do motorista e nem sempre chega. Sem ele o custo
+  // continua valendo — só o km/l daquele intervalo deixa de fechar. Exigir o
+  // que não existe empurraria a pessoa a inventar um número.
+  const semKm = await prisma.$transaction((tx) =>
+    gravarAbastecimento(tx, {
+      categoriaId: combustivel.id,
+      veiculo: veiculoDoTanque,
+      dados: {
+        veiculoId: viagem.veiculoId,
+        data: viagem.dataSaida,
+        litros: 200,
+        valorTotal: 1500,
+        valorLitro: 7.5,
+        odometro: null,
+        numeroNota: 'FAT-9912',
+        fornecedorId: posto.id,
+        tanqueCheio: true,
+        formaPagamento: 'BOLETO',
+        observacoes: MARCA,
+      },
+    }),
+  )
+  const registroSemKm = await prisma.abastecimento.findUniqueOrThrow({
+    where: { id: semKm },
+    include: { lancamento: { select: { valor: true } } },
+  })
+  checar(
+    'abastecimento sem km do painel é aceito e vira conta a pagar igual',
+    registroSemKm.odometro === null &&
+      Number(registroSemKm.lancamento?.valor) === 1500 &&
+      registroSemKm.numeroNota === 'FAT-9912',
+    `km ${registroSemKm.odometro}, R$ ${Number(registroSemKm.lancamento?.valor)}, nota ${registroSemKm.numeroNota}`,
+  )
+  const odometroDepois = (
+    await prisma.veiculo.findUniqueOrThrow({ where: { id: viagem.veiculoId } })
+  ).odometroAtual
+  checar(
+    'e não mexe no odômetro do caminhão',
+    odometroDepois === (veiculoDoTanque.odometroAtual ?? 0) + 500,
+    `${odometroDepois}`,
+  )
+  await prisma.$transaction((tx) => apagarAbastecimento(tx, semKm))
 
   const idDoTitulo = corrigido.lancamento!.id
   await prisma.$transaction((tx) => apagarAbastecimento(tx, tanque))

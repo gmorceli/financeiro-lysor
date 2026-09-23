@@ -202,14 +202,15 @@ export async function apagarManutencao(tx: Tx, id: string): Promise<void> {
 
 export type DadosAbastecimento = {
   veiculoId: string
-  viagemId?: string | null
   motoristaId?: string | null
-  fornecedorId?: string | null
+  fornecedorId: string
   data: Date
   litros: number
   valorTotal: number
   valorLitro: number
-  odometro: number
+  /** Anotação do motorista, que nem sempre chega. */
+  odometro?: number | null
+  numeroNota?: string | null
   tanqueCheio: boolean
   formaPagamento: FormaPagamento
   dataVencimento?: Date | null
@@ -255,8 +256,11 @@ export async function gravarAbastecimento(
       dataCompetencia: dados.data,
       dataVencimento: dados.dataVencimento ?? dados.data,
       veiculoId: dados.veiculoId,
-      viagemId: dados.viagemId ?? null,
-      fornecedorId: dados.fornecedorId ?? null,
+      // Sem viagem, e de propósito: um tanque cheio atende várias viagens, e
+      // amarrá-lo a uma delas jogava o diesel inteiro na primeira que o
+      // motorista anotou. O custo é do caminhão no mês, valor exato.
+      viagemId: null,
+      fornecedorId: dados.fornecedorId,
       formaPagamento: dados.formaPagamento,
       observacoes: dados.observacoes ?? null,
     },
@@ -265,14 +269,15 @@ export async function gravarAbastecimento(
 
   const campos = {
     veiculoId: dados.veiculoId,
-    viagemId: dados.viagemId ?? null,
+    viagemId: null,
     motoristaId: dados.motoristaId ?? null,
-    fornecedorId: dados.fornecedorId ?? null,
+    fornecedorId: dados.fornecedorId,
     data: dados.data,
     litros: new Prisma.Decimal(dados.litros),
     valorLitro: new Prisma.Decimal(dados.valorLitro.toFixed(4)),
     valorTotal: new Prisma.Decimal(arredondar(dados.valorTotal)),
-    odometro: dados.odometro,
+    odometro: dados.odometro ?? null,
+    numeroNota: dados.numeroNota ?? null,
     tanqueCheio: dados.tanqueCheio,
     lancamentoId: lancamento.id,
   }
@@ -288,7 +293,11 @@ export async function gravarAbastecimento(
   // O odômetro só avança; um abastecimento antigo lançado depois não pode
   // puxar a leitura do veículo para trás. Vale igual na correção: baixar o km
   // aqui não desfaz as leituras que vieram depois desta.
-  if (veiculo.tipo !== 'CARRETA' && dados.odometro > (veiculo.odometroAtual ?? 0)) {
+  if (
+    veiculo.tipo !== 'CARRETA' &&
+    dados.odometro != null &&
+    dados.odometro > (veiculo.odometroAtual ?? 0)
+  ) {
     await tx.veiculo.update({
       where: { id: dados.veiculoId },
       data: { odometroAtual: dados.odometro },
@@ -376,10 +385,13 @@ export async function gravarDespesa(
   const viagem = dados.viagemId
     ? await tx.viagem.findUnique({
         where: { id: dados.viagemId },
-        select: { veiculoId: true },
+        select: { veiculoId: true, excluidaEm: true },
       })
     : null
   if (dados.viagemId && !viagem) throw new Error('Viagem não encontrada.')
+  if (viagem?.excluidaEm) {
+    throw new Error('Esta viagem foi excluída. Escolha outra ou restaure a viagem.')
+  }
 
   const campos = {
     tipo: 'DESPESA' as const,

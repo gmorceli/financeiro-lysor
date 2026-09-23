@@ -42,7 +42,7 @@ export default async function Inicio() {
         })
       : [],
     prisma.viagem.findMany({
-      where: { status: { in: ['PLANEJADA', 'EM_ANDAMENTO'] } },
+      where: { status: { in: ['PLANEJADA', 'EM_ANDAMENTO'] }, excluidaEm: null },
       include: {
         veiculo: { select: { apelido: true } },
         motorista: { select: { nome: true } },
@@ -53,7 +53,7 @@ export default async function Inicio() {
     }),
     // Viagem fechada sem frete lançado é receita que ficou para trás.
     prisma.viagem.count({
-      where: { status: { not: 'PLANEJADA' }, fretes: { none: {} } },
+      where: { status: { not: 'PLANEJADA' }, fretes: { none: {} }, excluidaEm: null },
     }),
   ])
 

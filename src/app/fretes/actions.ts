@@ -30,6 +30,17 @@ export async function salvarFreteProprio(
     chaveCte: dados.chaveCte ?? null,
   }
 
+  // Viagem excluída não recebe frete novo: o CT-e nasceria já cancelado e o
+  // recebível do cliente não seria gerado.
+  const viagem = await prisma.viagem.findUnique({
+    where: { id: viagemId },
+    select: { excluidaEm: true },
+  })
+  if (!viagem) return { erroGeral: 'Viagem não encontrada.' }
+  if (viagem.excluidaEm) {
+    return { erroGeral: 'Esta viagem foi excluída. Restaure a viagem antes de lançar o frete.' }
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       if (id) {

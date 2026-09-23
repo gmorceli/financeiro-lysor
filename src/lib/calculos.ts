@@ -96,3 +96,16 @@ export function somarMeses(data: Date, meses: number): Date {
     ),
   )
 }
+
+/**
+ * O último tanque cheio que serve de referência de km/l.
+ *
+ * O km do painel passou a ser opcional — ele vem da anotação do motorista, e
+ * nem sempre chega. Um abastecimento sem km continua valendo como custo, mas
+ * não fecha intervalo de consumo, então não pode virar a leitura anterior de
+ * ninguém.
+ */
+export function ultimoComKm(registros: Array<{ odometro: number | null }>) {
+  const primeiro = registros[0]
+  return primeiro?.odometro != null ? { odometro: primeiro.odometro } : null
+}

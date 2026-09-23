@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { arredondar, calcularComissaoMotorista } from '@/lib/calculos'
+import { CATEGORIA } from '@/lib/categorias'
 
 /**
  * Motor de resultado gerencial.
@@ -140,13 +141,17 @@ export async function calcularResultado(
 
   const [
     viagens,
+    abastecimentos,
     fretesAgregado,
     lancamentosVeiculo,
     lancamentosDiretosSoltos,
     lancamentosOverhead,
   ] = await Promise.all([
     prisma.viagem.findMany({
-      where: { dataSaida: periodo },
+      // Viagem excluída não entra em nenhuma camada. A exclusão é lógica: o
+      // registro fica para consulta e restauração, mas o resultado do mês tem
+      // de ser o mesmo que seria se a viagem nunca tivesse sido lançada.
+      where: { dataSaida: periodo, excluidaEm: null },
       include: {
         veiculo: { select: { id: true, apelido: true } },
         motorista: { select: { percentualComissao: true, baseComissao: true } },
@@ -162,8 +167,14 @@ export async function calcularResultado(
           },
           select: { valor: true },
         },
-        abastecimentos: { select: { litros: true } },
       },
+    }),
+    // Litros do período por caminhão. Vêm do abastecimento, e não mais de
+    // dentro da viagem: um tanque cheio atende várias viagens, e prendê-lo a
+    // uma delas fazia o km/l de todas sair errado.
+    prisma.abastecimento.findMany({
+      where: { data: periodo },
+      select: { litros: true, veiculoId: true },
     }),
     prisma.frete.findMany({
       where: { modalidade: 'AGREGADO', dataEmissao: periodo, status: { not: 'CANCELADO' } },
@@ -260,11 +271,17 @@ export async function calcularResultado(
       viagem.lancamentos.reduce((s, l) => s + Number(l.valor), 0) + comissaoDaViagem(viagem)
     linha.kmRodado += viagem.kmFinal != null ? viagem.kmFinal - viagem.kmInicial : 0
     linha.kmVazio += viagem.kmVazio ?? 0
-    linha.litros += viagem.abastecimentos.reduce((s, a) => s + Number(a.litros), 0)
     linha.viagens += 1
     linha.fretes += viagem.fretes.length
 
     porVeiculo.set(chave, linha)
+  }
+
+  // Litros do mês, por caminhão. Entram depois das viagens porque o veículo
+  // pode ter abastecido num mês em que não fechou viagem nenhuma.
+  for (const abastecimento of abastecimentos) {
+    const linha = porVeiculo.get(abastecimento.veiculoId)
+    if (linha) linha.litros += Number(abastecimento.litros)
   }
 
   // Custo do veículo entra por inteiro no resultado do próprio veículo — não
@@ -365,11 +382,18 @@ export async function calcularResultado(
 }
 
 /**
- * Resultado frete a frete.
+ * Resultado frete a frete, **antes do combustível**.
  *
- * Aqui o rateio é inevitável: diesel e pedágio são da viagem, não de um CT-e
- * específico. O critério padrão é a proporção do valor do frete — o frete que
- * responde por metade da receita da viagem carrega metade do custo dela.
+ * O diesel ficou de fora de propósito, e é a mudança que mais muda a leitura
+ * desta tela. Um tanque cheio atende várias viagens; qualquer critério que o
+ * distribuísse entre elas seria invenção — e invenção que engana, porque sai
+ * com duas casas decimais e cara de fato. O combustível aparece inteiro, pelo
+ * valor exato, no fechamento do caminhão no mês.
+ *
+ * O que sobra aqui é o que de fato pertence ao frete: pedágio, despesa de
+ * estrada e comissão do motorista. Esses ainda são rateados entre os CT-e da
+ * mesma viagem pela proporção do valor do frete — o frete que responde por
+ * metade da receita da viagem carrega metade do pedágio dela.
  *
  * O custo do veículo entra por km: o custo do mês daquele caminhão dividido
  * pelos km que ele rodou no mês, multiplicado pelos km da viagem, e então
@@ -384,7 +408,7 @@ export async function calcularResultadoPorFrete(
   const [viagens, lancamentosVeiculo, lancamentosDiretosSoltos, fretesAgregado] =
     await Promise.all([
       prisma.viagem.findMany({
-        where: { dataSaida: periodo },
+        where: { dataSaida: periodo, excluidaEm: null },
         include: {
           veiculo: { select: { id: true, apelido: true } },
           motorista: { select: { percentualComissao: true, baseComissao: true } },
@@ -395,7 +419,7 @@ export async function calcularResultadoPorFrete(
           lancamentos: {
             where: {
               tipo: 'DESPESA',
-              categoria: { nivelCusto: 'DIRETO_VIAGEM' },
+              categoria: { nivelCusto: 'DIRETO_VIAGEM', nome: { not: CATEGORIA.COMBUSTIVEL } },
               status: { not: 'CANCELADO' },
             },
             select: { valor: true },
@@ -411,11 +435,13 @@ export async function calcularResultadoPorFrete(
         },
         select: { valor: true, veiculoId: true },
       }),
+      // Pedágio e despesa de estrada lançados sem viagem. O combustível fica
+      // de fora: é o custo que esta tela declara não ratear.
       prisma.lancamento.findMany({
         where: {
           tipo: 'DESPESA',
           dataCompetencia: periodo,
-          categoria: { nivelCusto: 'DIRETO_VIAGEM' },
+          categoria: { nivelCusto: 'DIRETO_VIAGEM', nome: { not: CATEGORIA.COMBUSTIVEL } },
           viagemId: null,
           status: { not: 'CANCELADO' },
         },

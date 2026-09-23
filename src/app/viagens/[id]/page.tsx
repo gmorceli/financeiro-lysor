@@ -16,6 +16,7 @@ import {
 } from '@/components/ui'
 import { FecharViagem } from '../fechar-viagem'
 import { ExcluirCusto, ReabrirViagem } from './acoes'
+import { RestaurarViagem } from './restaurar'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +63,6 @@ export default async function DetalheViagem({
         },
         orderBy: { dataCompetencia: 'asc' },
       },
-      abastecimentos: { select: { litros: true } },
     },
   })
 
@@ -84,7 +84,9 @@ export default async function DetalheViagem({
     0,
   )
   const kmRodado = viagem.kmFinal != null ? viagem.kmFinal - viagem.kmInicial : null
-  const aberta = viagem.status === 'EM_ANDAMENTO' || viagem.status === 'PLANEJADA'
+  const excluida = viagem.excluidaEm != null
+  const aberta =
+    !excluida && (viagem.status === 'EM_ANDAMENTO' || viagem.status === 'PLANEJADA')
 
   // Custos diretos: o que foi apropriado a esta viagem. A comissão do motorista
   // ainda não é um título — ela nasce no acerto — mas já entra na conta para o
@@ -92,16 +94,36 @@ export default async function DetalheViagem({
   const custosLancados = viagem.lancamentos.reduce((soma, l) => soma + Number(l.valor), 0)
   const custoDireto = custosLancados + comissao
   const margem = receita - custoDireto
-  const litros = viagem.abastecimentos.reduce((soma, a) => soma + Number(a.litros), 0)
-  const consumoViagem = kmRodado && litros > 0 ? kmRodado / litros : null
 
   return (
     <>
       <CabecalhoPagina
         titulo={`Viagem ${viagem.numero}`}
         descricao={`${viagem.veiculo.apelido} · ${viagem.origem} → ${viagem.destino}`}
-        acao={<Badge tom={aberta ? 'alerta' : 'positivo'}>{ROTULO_STATUS[viagem.status]}</Badge>}
+        acao={
+          excluida ? (
+            <Badge tom="neutro">Excluída</Badge>
+          ) : (
+            <Badge tom={aberta ? 'alerta' : 'positivo'}>{ROTULO_STATUS[viagem.status]}</Badge>
+          )
+        }
       />
+
+      {excluida && (
+        <Card className="mb-4 border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-texto">
+            <strong className="font-medium text-alerta">Esta viagem foi excluída</strong>{' '}
+            em {formatarData(viagem.excluidaEm)}
+            {viagem.excluidaPor ? ` por ${viagem.excluidaPor}` : ''}
+            {viagem.motivoExclusao ? `: ${viagem.motivoExclusao}` : '.'}
+          </p>
+          <p className="mt-1 text-sm text-texto-suave">
+            Ela está fora das listas, dos relatórios de lucro, do contas a receber e do
+            cálculo de comissão. Os números abaixo são o que ela era.
+          </p>
+          <RestaurarViagem viagemId={viagem.id} numero={viagem.numero} />
+        </Card>
+      )}
 
       <Card className="mb-4 p-4">
         <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -240,25 +262,20 @@ export default async function DetalheViagem({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-borda px-4 py-3">
           <h2 className="text-sm font-semibold text-texto">Custos desta viagem</h2>
           {aberta && (
-            <div className="flex flex-wrap gap-2">
-              <Link href={rota(`/viagens/${viagem.id}/abastecimentos/novo`)}>
-                <Button variante="secundario">Abastecimento</Button>
-              </Link>
-              <Link href={rota(`/viagens/${viagem.id}/despesas/novo`)}>
-                <Button variante="secundario">Despesa</Button>
-              </Link>
-            </div>
+            <Link href={rota(`/viagens/${viagem.id}/despesas/novo`)}>
+              <Button variante="secundario">Lançar despesa</Button>
+            </Link>
           )}
         </div>
 
         {viagem.lancamentos.length === 0 ? (
           <EstadoVazio
             titulo="Nenhum custo lançado"
-            descricao="Diesel, pedágio e despesa de estrada entram aqui e viram conta a pagar automaticamente."
+            descricao="Pedágio, chapa e despesa de estrada entram aqui e viram conta a pagar automaticamente. Diesel não: o abastecimento é do caminhão, e vai em Custos."
             acao={
               aberta ? (
-                <Link href={rota(`/viagens/${viagem.id}/abastecimentos/novo`)}>
-                  <Button>Lançar abastecimento</Button>
+                <Link href={rota(`/viagens/${viagem.id}/despesas/novo`)}>
+                  <Button>Lançar despesa</Button>
                 </Link>
               ) : undefined
             }
@@ -354,30 +371,50 @@ export default async function DetalheViagem({
             Ainda sem o custo do caminhão (manutenção, seguro, parcela) nem o custo fixo da
             empresa — esses entram no relatório de resultado do mês.
             {kmRodado ? ` Custo de ${formatarMoeda(custoDireto / kmRodado)} por km rodado.` : ''}
-            {consumoViagem ? ` Consumo de ${consumoViagem.toFixed(2).replace('.', ',')} km/l.` : ''}
           </p>
         </Card>
       )}
 
-      {aberta ? (
+      {excluida ? (
         <Card className="p-4">
-          <h2 className="mb-4 text-sm font-semibold text-texto">Fechar viagem</h2>
-          <FecharViagem viagemId={viagem.id} kmInicial={viagem.kmInicial} />
+          <Link href="/viagens">
+            <Button variante="secundario">Voltar para viagens</Button>
+          </Link>
         </Card>
       ) : (
-        <Card className="p-4">
-          <h2 className="text-sm font-semibold text-texto">Chegou custo depois?</h2>
-          <p className="mt-1 text-sm text-texto-suave">
-            Viagem fechada não aceita lançamento. Reabrir devolve os botões de
-            abastecimento e despesa, e depois é só fechar de novo com o mesmo km.
-          </p>
-          <ReabrirViagem viagemId={viagem.id} numero={viagem.numero} />
-          <div className="mt-4 border-t border-borda pt-4">
-            <Link href="/viagens">
-              <Button variante="secundario">Voltar para viagens</Button>
-            </Link>
-          </div>
-        </Card>
+        <>
+          {aberta ? (
+            <Card className="mb-4 p-4">
+              <h2 className="mb-4 text-sm font-semibold text-texto">Fechar viagem</h2>
+              <FecharViagem viagemId={viagem.id} kmInicial={viagem.kmInicial} />
+            </Card>
+          ) : (
+            <Card className="mb-4 p-4">
+              <h2 className="text-sm font-semibold text-texto">Chegou custo depois?</h2>
+              <p className="mt-1 text-sm text-texto-suave">
+                Viagem fechada não aceita lançamento. Reabrir devolve o botão de despesa,
+                e depois é só fechar de novo com o mesmo km.
+              </p>
+              <ReabrirViagem viagemId={viagem.id} numero={viagem.numero} />
+            </Card>
+          )}
+
+          <Card className="p-4">
+            <h2 className="text-sm font-semibold text-texto">Lançou errado?</h2>
+            <p className="mt-1 text-sm text-texto-suave">
+              Viagem duplicada, placa trocada, CT-e cancelado. Excluir tira a viagem das
+              listas e de todos os relatórios, e continua dando para restaurar.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href={rota(`/viagens/${viagem.id}/excluir`)}>
+                <Button variante="perigo">Excluir viagem</Button>
+              </Link>
+              <Link href="/viagens">
+                <Button variante="secundario">Voltar para viagens</Button>
+              </Link>
+            </div>
+          </Card>
+        </>
       )}
     </>
   )

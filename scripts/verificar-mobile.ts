@@ -62,7 +62,11 @@ async function main() {
       expiraEm: new Date(Date.now() + 86400000),
     },
   })
-  const viagem = await prisma.viagem.findFirstOrThrow({ orderBy: { criadoEm: 'desc' } })
+  // Viagem viva: a tela de exclusão de uma viagem já excluída é outra tela.
+  const viagem = await prisma.viagem.findFirstOrThrow({
+    where: { excluidaEm: null },
+    orderBy: { criadoEm: 'desc' },
+  })
   const motorista = await prisma.motorista.findFirstOrThrow({ where: { ativo: true } })
   const agregado = await prisma.proprietario.findFirstOrThrow({ where: { ativo: true } })
   const manutencao = await prisma.manutencao.findFirstOrThrow({ orderBy: { criadoEm: 'desc' } })
@@ -88,7 +92,8 @@ async function main() {
   })
 
   const ROTAS = [
-    '/', '/viagens', '/viagens/nova', `/viagens/${viagem.id}`,
+    '/', '/viagens', '/viagens?excluidas=1', '/viagens/nova', `/viagens/${viagem.id}`,
+    `/viagens/${viagem.id}/excluir`,
     '/fretes', `/viagens/${viagem.id}/fretes/novo`, '/fretes/agregado/novo', '/fretes/importar',
     `/fretes/${freteProprio.id}`,
     '/custos', '/custos/abastecimentos/novo', '/custos/manutencoes/novo',

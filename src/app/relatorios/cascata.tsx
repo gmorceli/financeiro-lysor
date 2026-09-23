@@ -122,9 +122,10 @@ export function Cascata({ resultado }: { resultado: ResultadoPeriodo }) {
         </div>
         {resultado.custoDiretoSemViagem > 0 && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-alerta">
-            {formatarMoeda(resultado.custoDiretoSemViagem)} em custos diretos lançados
-            sem viagem e sem caminhão que rodasse no período — entram no resultado, mas
-            ninguém sabe de qual frete são. Lance diesel e pedágio pela tela da viagem.
+            {formatarMoeda(resultado.custoDiretoSemViagem)} em custos diretos de um
+            caminhão que não rodou no período, ou sem caminhão nenhum — entram no
+            resultado, mas ficam fora do lucro de qualquer frete. Confira a data e o
+            caminhão desses lançamentos em Custos.
           </p>
         )}
         {resultado.custoVeiculoSemViagem > 0 && (
